@@ -8,7 +8,6 @@
 % cloudiness has a range of 0 - 1
 % swRad model is either EPA or MBH 
 % long and lat in degrees 
-% dew point 
 % elevation of resivours
 % Jday = Julian day of the year 
 % HOUR is hour of the year 
@@ -16,9 +15,12 @@
 % TZ is time zone
 % Ts and Tair is Temp of the surface and temp of the air 
 % cond model could probably be simplifed down to just resivour or lake
-% Es and Ea is evaporation data for saturation vapor pressure at water
-% surface and atmospheric vapor pressure. 
-function output = surfaceOutput(swRadModel,cloudiness,long,lat,Tdpt,z,Jday,HOUR,year,month,TZ, Tair, Ts, condModel, Wz, es, ea)
+% rZ is relative depth to surface, if its zero its considered surface, if
+% not then it uses shortwave penetration
+function output = surfaceOutput(swRadModel,cloudiness,long,lat,z,Jday,HOUR,year,month,TZ, Tair, Ts, condModel, Wz, RH,rZ)
+    es = saturationVaporPressureCalc(Tair);
+    ea = vaporPressure(RH,es);
+    Tdpt = dewPointTempCalc(ea);
     if swRadModel == EPA
         s = swEPAcalc(long,lat,Jday,HOUR);
     elseif swRadModel == MBH 
@@ -30,15 +32,21 @@ function output = surfaceOutput(swRadModel,cloudiness,long,lat,Tdpt,z,Jday,HOUR,
     else
         error('Please Enter Valid Model, either EPA or MBH');
     end
+    if rZ == 0
+        sn = s - sr;
+    else
+        sn = swRadPen(s - sr,rZ);
+    end
     an = lwRCalc(Tair,cloudiness);
     br = bRCalc(Ts);
+
     if condModel == genModel % gen model does stuff 
         e = evapCalcGenModel(Wz,es,ea);
     else
         e = evapCalcReservoirModel(Wz,es,ea);
     end
     c = conductionReservoirModel(Wz,Tair,Ts);
-    output = s-sr+an-br-e-c;
+    output = sn+an-br-e-c;
 end
 
 %Ba = 0.84; % irradiance to total irrdiance ratio
@@ -166,6 +174,14 @@ function out = swMBHcalc(cloudiness,Ba,K1,ta038,ta050,long,lat,Tdpt,z,Jday, HOUR
     out = (directHz + Ias) / (1 - Rt * rs);
 end
 
+function out = swRadPen(sn,z) % UNFINSIHED 
+    %n = extinction coefficient 
+    %b = fraction absorbed at water surface 
+    % uhhhhhhhhhhhh
+
+    out = (1 - beta)*sn * exp(-n*z);
+end
+
 
 function out = lwRCalc(Tair,cloudiness) %  net long wave radiation formula.
     sigma = 5.67*10^-8;
@@ -183,6 +199,21 @@ function out = bRCalc(Ts) % back radiation
     sigma = 5.67*10^-8;
     out = epsilon*sigma*(Ts + 273.15)^4; % Ts is water temp surface in Celcius
 end
+
+function out = saturationVaporPressureCalc(Tair)
+    out = 6.1094*exp((17.625 * Tair)/(Tair + 243.04)); % From August Roche Magnus formula, assuming it temps don't go below freezing (uh oh)
+end
+function out = vaporPressure(RH,eS)
+    out = eS * (RH/100);
+end
+
+function out = dewPointTempCalc(vapourPressure) % from Magnus formula 
+    alpha = 6.112; % in hPa
+    beta =  17.63; % constant
+    Lambda = 243.12; % in Celcius
+    out = (Lambda) * ln(vapourPressure/alpha) / (beta - ln(vaporPressure/alpha));
+end
+
 
 function out = windSpeedFunctionGenModel(Wz) % model 1 from Edinger et al 1974
     c = 2; 
