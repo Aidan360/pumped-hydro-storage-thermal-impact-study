@@ -179,6 +179,7 @@ function out = swMBHcalc(cloudiness,Ba,K1,ta038,ta050,long,lat,Tdpt,z,Jday, HOUR
 end
 
 
+
 function out = lwRCalc(Tair,cloudiness) %  net long wave radiation formula.
     sigma = 5.67*10^-8;
     if Tair >= 5 % Swinbank Formula 
@@ -219,20 +220,37 @@ function out = windSpeedFunctionGenModel(Wz) % model 1 from Edinger et al 1974
     out = a + b*Wz ^ c; % evaporative wind speed function at wind height of z, measured at 2m off the ground if this is
 end
 
+
+
 function out = evapCalcGenModel(Wz,es,ea) % evaporation heat loss  BIG NOTE: ASSUME WIND IS MEASURED FROM 2METERS OFF THE GROUND
     out = windSpeedFunctionGenModel(Wz) * (es - ea) / 1.333;  % es is saturation vapor pressaure at water surface mmHg, and atmospheric vapure pressure at mmHg
     % /1.333 for milibars to mmHg
 end
 
+
+function out = windSpeedFunctionReservoirModel(Wz)
+    out = 10.512 + 2.94 * Wz;
+end
+
+function out = evapCalcReservoirModel(Wz,es,ea)
+    % disp("evap stuff")
+    % disp(es)
+    % disp(ea)
+    out = (80 + 10*(Wz)) * (es - ea);
+end
 function out = conductionGenModel(Wz,Ta,Ts)
     Cc = 0.47; % Bowen Coefficient , 0.47mm Hg C--1
     out = Cc*windSpeedFunctionGenModel(Wz)*(Ts - Ta);
 end
 
+function out = conductionReservoirModel(Wz,Ta,Ts)
+    Cc = 0.47; % Bowen Coefficient , 0.47mm Hg C--1
+    out = Cc*windSpeedFunctionReservoirModel(Wz)*(Ts - Ta);
+end
+
 
 
 % dead model pile
-%{
 function out = swEPAcalc(long,lat,Jday,HOUR) % short wave solar radiation model for EPA
     Td = (2*pi*round(Jday) - 1) / 365;
     delta = 0.006918 - 0.399912*cos(Td) + 0.070257*sin(Td) - 0.006758*cos(2*Td) + 0.000907*sin(2*Td) - 0.002697*cos(3*Td) + 0.001480*sin(3*Td); 
@@ -245,19 +263,7 @@ function out = swEPAcalc(long,lat,Jday,HOUR) % short wave solar radiation model 
     Ao = asin(sin(lat)*sin(delta) + cos(lat)*cos(delta)*cos(H)); % Ao is solar altiude
     out = 24*(2.044 * Ao + 0.1296*Ao^2 - 1.941*(10^-3)*Ao^3 + (7.591*10^-6)*Ao^4) * 0.1314;
 end
-
-function out = windSpeedFunctionReservoirModel(Wz)
-    out = 10.512 + 2.94 * Wz;
-end
 function out = conductionReservoirModel(Wz,Ta,Ts)
     Cc = 0.47; % Bowen Coefficient , 0.47mm Hg C--1
     out = Cc*windSpeedFunctionReservoirModel(Wz)*(Ts - Ta);
 end
-function out = evapCalcReservoirModel(Wz,es,ea)
-    % disp("evap stuff")
-    % disp(es)
-    % disp(ea)
-    out = (80 + 10*(Wz)) * (es - ea);
-end
-
-%}

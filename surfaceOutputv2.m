@@ -1,21 +1,14 @@
-%mat lab timeeee
-
-% 9:15 - 10:15 important notes: gotta fix the code and bug test it until
-% the model is working. when that happens i should make a code interpolater
-% for everything 
+%version 2 will make it so tabulated results are seperated from predetermined calculations so they're not repeated every time the program is ran. 
+% inferior or unused models will also be removed
 %  Test = surfaceOutput(0,-121.190,45.608,50,15,12,2026,4,-8, 18.3, 15.4,3, 30)
-% 9:45 - 10:30
-% short wave is by sun, long wave is radiation from the earths atmosphere 
-% 11 - 11:40 
-% 12:05 - 1:30; break to take shower 1:50 - 
 
 % cloudiness has a range of 0 - 1
 % swRad model is either EPA or MBH 
 % long and lat in degrees 
 % elevation of resivours
 % Jday = Julian day of the year 
-% HOUR is hour of the year 
-% year ofc is year 
+% HOUR is hour of the day
+% year  year 
 % TZ is time zone
 % Ts and Tair is Temp of the surface and temp of the air 
 % cond model could probably be simplifed down to just resivour or lake
@@ -24,26 +17,30 @@
 % wind speed units are m/s
 
 
-function output = surfaceOutput(cloudiness,long,lat,z,Jday,HOUR,year,month,TZ, Tair, Ts, Wz, RH)
+function output = surfaceOutputv2(cloudiness,long,lat,z,Jday,HOUR,year,month,TZ, Tair, Ts, Wz, RH)
+    preTabulatedData = preTabCalc()
+
     es = saturationVaporPressureCalc(Tair);
     ea = vaporPressure(RH,es);
     Tdpt = dewPointTempCalc(ea);
-    % if swRadModel == "EPA"
-    %     s = swEPAcalc(long,lat,Jday,HOUR);
-    %elseif swRadModel == "MBH" 
-    Ba = 0.84; %Ba is recommended to be 0.84
-    K1 = 0.1; %K1 is recommended to be 0.1 unless more data is available
-    %We're going to assume its in the pacific north west?? so ta038 and
-    %ta050 will be 0.1 and 0.05 (mt vernon stuff)
-    ta038 = 0.05;
-    ta050 = 0.1;
-    s = swMBHcalc(cloudiness,Ba,K1,ta038,ta050,long,lat,Tdpt,z,Jday,HOUR,year,month,TZ);
+        %Ba is recommended to be 0.84
+        %K1 is recommended to be 0.1 unless more data is available
+        %We're going to assume its in the pacific north west?? so ta038 and
+        %ta050 will be 0.1 and 0.05 (mt vernon stuff)
+    s = swMBHcalc(cloudiness,0.84,0.1,0.05,0.1,long,lat,Tdpt,z,Jday,HOUR,year,month,TZ);
+
     an = lwRCalc(Tair,cloudiness);
     br = bRCalc(Ts);
+
+   % if condModel == genModel % gen model does stuff 
+    %    e = evapCalcGenModel(Wz,es,ea);
+   %$ else
+   % e = evapCalcReservoirModel(Wz,es,ea);
     e = evapCalcGenModel(Wz,es,ea);
+    %c = conductionReservoirModel(Wz,Tair,Ts);
     c = conductionGenModel(Wz,Tair,Ts);
     disp("shortwave")
-    disp(s)
+    disp(sn)
     disp("longWave")
     disp(an)
     disp("back rad")
@@ -52,29 +49,29 @@ function output = surfaceOutput(cloudiness,long,lat,z,Jday,HOUR,year,month,TZ, T
     disp(e)
     disp("conduction")
     disp(c)
-
     output = s + an - br - e - c;
 end
+
+%Ba = 0.84; % irradiance to total irrdiance ratio
+%K1 = 0.1; % aerosol absorptance coefficient
+%ta038 = 0.05; % 
+%ta050 = 0.1; 
 %TZ = -8;
-
-
-
+function out = preTabCalc() %oh boy theres going to be a lot here
+    out = num;
+end
 function out = swMBHcalc(cloudiness,Ba,K1,ta038,ta050,long,lat,Tdpt,z,Jday, HOUR,year,month,TZ) % shortwave solar radtion model from Meeus, Bird and hulstrom models
-    
-    Mday = Jday - TZ/24; % Jday is julian day, TZ is time zone adjusted to GMT
+    Mday = Jday - TZ/24; % Jday is julian day, TZ is time zone adjusted to GMT, all /24 changed to 
     DD = Mday + HOUR/24;
     if year <= 2 
         year = year - 1;
         month = month + 12;
     end
-    Ajd = floor(year/100);
+    Ajd = floor(year*0.01); % from /100
     Bjd = 2 - Ajd + floor(Ajd/4.0);
-    JD = floor(365.25*(year + 4716.0)) + floor(30.6001*(month + 1)) + DD + Bjd - 1524.5;% julian ephermeris day
-    t = (JD - 2451545.0) / 36525.0; % julian centuries
+    JD = floor(365.25*(year + 4716.0)) + floor(30.6001*(month + 1)) + DD + Bjd - 1524.5;% julian ephermeris day % TAB
+    t = (JD - 2451545.0) / 36525.0; % julian centuries % TAB
     eEarth = 0.016708734 - t*(0.000042037 + 0.0000001267*t); % t is the julian centuries. why is there here, idk man 
-
-
-
     % COPY AND PASTE FROM EPA MODEL, sorta modded by stuff
     LO = 280.46646 + t*(36000.76983 + 0.0003032*t);
     M = 357.52911 + t*(35999.05029 - 0.0001537*t); % mean geometric anomoly of the sun
@@ -179,6 +176,7 @@ function out = swMBHcalc(cloudiness,Ba,K1,ta038,ta050,long,lat,Tdpt,z,Jday, HOUR
 end
 
 
+
 function out = lwRCalc(Tair,cloudiness) %  net long wave radiation formula.
     sigma = 5.67*10^-8;
     if Tair >= 5 % Swinbank Formula 
@@ -219,45 +217,31 @@ function out = windSpeedFunctionGenModel(Wz) % model 1 from Edinger et al 1974
     out = a + b*Wz ^ c; % evaporative wind speed function at wind height of z, measured at 2m off the ground if this is
 end
 
+
+
 function out = evapCalcGenModel(Wz,es,ea) % evaporation heat loss  BIG NOTE: ASSUME WIND IS MEASURED FROM 2METERS OFF THE GROUND
     out = windSpeedFunctionGenModel(Wz) * (es - ea) / 1.333;  % es is saturation vapor pressaure at water surface mmHg, and atmospheric vapure pressure at mmHg
     % /1.333 for milibars to mmHg
 end
 
-function out = conductionGenModel(Wz,Ta,Ts)
-    Cc = 0.47; % Bowen Coefficient , 0.47mm Hg C--1
-    out = Cc*windSpeedFunctionGenModel(Wz)*(Ts - Ta);
-end
-
-
-
-% dead model pile
-%{
-function out = swEPAcalc(long,lat,Jday,HOUR) % short wave solar radiation model for EPA
-    Td = (2*pi*round(Jday) - 1) / 365;
-    delta = 0.006918 - 0.399912*cos(Td) + 0.070257*sin(Td) - 0.006758*cos(2*Td) + 0.000907*sin(2*Td) - 0.002697*cos(3*Td) + 0.001480*sin(3*Td); 
-    EQT = 0.170*sin(4*pi*(round(Jday) - 80) / 374) - 0.129*sin(2*pi*(round(Jday) - 8)/355);
-    standardMeridian = 15 * round(long/15.0);
-
-    H = (2*pi / 24) * (HOUR - (long - standardMeridian) * 24/360 + EQT - 12.0); % local hour angle in radians
-    disp("H")
-    disp(H) 
-    Ao = asin(sin(lat)*sin(delta) + cos(lat)*cos(delta)*cos(H)); % Ao is solar altiude
-    out = 24*(2.044 * Ao + 0.1296*Ao^2 - 1.941*(10^-3)*Ao^3 + (7.591*10^-6)*Ao^4) * 0.1314;
-end
 
 function out = windSpeedFunctionReservoirModel(Wz)
     out = 10.512 + 2.94 * Wz;
 end
-function out = conductionReservoirModel(Wz,Ta,Ts)
-    Cc = 0.47; % Bowen Coefficient , 0.47mm Hg C--1
-    out = Cc*windSpeedFunctionReservoirModel(Wz)*(Ts - Ta);
-end
+
 function out = evapCalcReservoirModel(Wz,es,ea)
     % disp("evap stuff")
     % disp(es)
     % disp(ea)
     out = (80 + 10*(Wz)) * (es - ea);
 end
+function out = conductionGenModel(Wz,Ta,Ts)
+    Cc = 0.47; % Bowen Coefficient , 0.47mm Hg C--1
+    out = Cc*windSpeedFunctionGenModel(Wz)*(Ts - Ta);
+end
 
-%}
+function out = conductionReservoirModel(Wz,Ta,Ts)
+    Cc = 0.47; % Bowen Coefficient , 0.47mm Hg C--1
+    out = Cc*windSpeedFunctionReservoirModel(Wz)*(Ts - Ta);
+end
+
