@@ -1,0 +1,388 @@
+%% =========================================================
+% CYCLIC PHS MODEL (CONTROL VOLUME + TEMPERATURE)
+% TURBINE + PUMP WITH SCHEDULING –  with efficiency heat source
+% SURFACE HEAT TRANSFER
+%
+% =========================================================
+clear; clc;
+%% -----------------------------
+% 1. VARIABLES
+%% -----------------------------
+
+waterDensity   =        1000; % [kg/m^3]
+Cp    = 4186;      % specific heat        [J/(kg·K)]
+g        = 9.81;    % gravity              [m/s^2]
+long = -121.190;
+lat = 45.608;
+TZ = -8;
+
+%upper resivour parameters
+% resiovur modeled as cone to simulate water loss 
+
+resMaxRadius = 1000; %[m] Resivour Radius at Max depth    
+resMaxDepth     =   12;%[m]        
+resMinDepth     =   3; %[m] Resivours need a miminum depth to function. 
+resInitalDepth    =   8; % [m]
+resInitalRadius   = resRadCalc(resInitalDepth,resMaxRadius,resMaxDepth); %[m]
+resInitalSurfaceArea = resAreaCalc(resInitalDepth,resMaxRadius,resMaxDepth); % [m^2]
+resInitalVolume = resVolumeCalc(resInitalDepth,resInitalRadius); %[m^3]
+Tin   = 16.1;        % initial temperature of upper resiovur  [°C]
+head   = 100;     % hydraulic head       [m]
+
+
+%transient resivour variables
+resD = resInitalDepth* ones(1,24); %[m]
+resV = resInitalVolume * ones(1,24); %[m^3]
+resSA = resInitalSurfaceArea; %[m^2]
+resT = Tin*ones(1,24); %[C]
+resTControl = Tin*ones(1,24);
+
+%river values
+riverDischarge = 7500; % [m^3/s] average rate
+riverTemp = 16.1; % [C]
+riverElevation = 50; %[m]
+riverT = Tin*ones(1,24); % [C]
+riverTControl = Tin*Ones(1,24);
+%riverSA = 0.67*10^6; %[m^2] surface area taken from top of dalles dam 
+% --- Turbine Parameters ---
+turbineEff = 0.90;    % turbine efficiency   [-]
+pumpEff = 0.85;    % pump efficiency      [-]
+turbmMFR = 10700;        % max turbine flow rate    [m^3/s] using data from dalles dam
+pumpmMFR = 10700;        % max pump flow rate       [m^3/s]
+
+turbHeatCoff = (1 - turbineEff) * waterDensity * g * head; % [J/m^3] 
+pumpHeatCoff = (1/pumpEff - 1) * waterDensity * g * head; % [J/m^3]
+turbPowerCoff = (turbineEff) * waterDensity * g * head; % [J/m^3] 
+pumpPowerCoff = (pumpEff) * waterDensity * g * head; % [J/m^3]
+% m^3/s * J/m^3 = W
+
+%%-----------------
+% 2. Thermal Scheduling
+% Using power grid schedule
+%%----------------
+% 0 = no flow, 1 = fill, 2 = drain
+%{ 
+Simple Schedule Start up to simulate realistic daily flows 
+Hours 1-8, filling as people are asleep 
+Hours 9-20, draining as people work and stuff 
+Hours 21 - 24 filling as people sleep
+%} 
+schedule = [ones(1,7),2 * ones(1,12),ones(1,5)];
+%schedule = [zeros(1,24)];
+
+%{Required Single Inputs 
+% Tres, Triv 
+%Required Tabulated inputs
+%Tair*, Wz*, river flow rate, river speed, solar radiation*
+%Optional Tabulated inputs
+% river Normal 
+%}
+% Import data from CSV, excluding header row
+T = readtable('june6thData.csv','ReadVariableNames',true);
+
+% Map requested columns (excluding first/header row already handled by readtable)
+% Assuming columns are labeled as in the CSV; if not, access by column index.
+% Columns: C -> 3, E -> 5, G -> 7, I -> 9, K -> 11
+% Convert to numeric vectors if they are cell or string.
+sTair = T{:,3};
+sWz = T{:,5};
+sSolarRad = T{:,7};
+sRiverV = T{:,9};
+rivFlowRate = T{:,11};
+sRH = 0.01*T{:,12};
+rivControlTemp = T{:,13};
+% Ensure row vectors of length 24 (if source has more/less rows, trim or pad with last value)
+n = 24;
+trimOrPad = @(v) ( ...
+    (numel(v) >= n) * v(1:n).' + (numel(v) < n) * [v(:).' , repmat(v(end),1,n-numel(v))] ...
+    );
+sTair = trimOrPad(sTair);
+sWz = trimOrPad(sWz);
+sSolarRad = trimOrPad(sSolarRad);
+sRiverV = trimOrPad(sRiverV);
+rivFlowRate = trimOrPad(rivFlowRate);
+sRH = trimOrPad(sRH);
+rivControlTemp = trimOrPad(rivControlTemp);
+%sRiverT = [] % get this on sunday aidan.
+% 2160 max production, on average 20,000 MWh so roughly like 350MW on
+% average, lets do a peak of 500 for output. Assume power output follows
+% the function in a day of cos(pi/12 x + 14.5)
+
+
+%%------------------
+% 3. Thermal Processes
+%%------------------
+mode = -1;
+for hourTime = 1:24
+    if hourTime == 1
+    
+    else
+        resT(hourTime) = resT(hourTime-1);
+        riverT(hourTime) = riverT(hourTime-1);
+        resD(hourTime) = resD(hourTime - 1);
+        resV(hourTime) = resV(hourTime - 1);
+        resTControl(hourTime) = resTControl(hourTime - 1);
+        riverTControl(hourTime) = riverTControl(hourTime - 1);
+    end
+      
+    for minTime = 1:4 % 15 minute intervals apparently
+        if resD(hourTime) >= resMaxDepth || resD(hourTime) <= resMinDepth
+            mode = 0;
+        else
+            mode = schedule(hourTime);
+        end
+        t = (4*(hourTime) + minTime);
+        if mode == 0
+            dT = noFlowCondition(resD(hourTime),sTair(hourTime),sWz(hourTime), ...
+                rivFlowRate(hourTime),riverT(hourTime),resT(hourTime),resV(hourTime), ...
+                Cp,resMaxRadius,resMaxDepth,sRiverV(hourTime),sSolarRad(hourTime),sRH(hourTime));
+            resT(hourTime) =  dT(1); 
+            riverT(hourTime) = dT(2);
+        else
+            powerReq = powerOutputSimpleSchedule(hourTime) * 10^6; %[W]
+            %disp(powerReq)
+            if powerReq >= 0
+                reqFlowRate = -powerReq/turbPowerCoff; % flow condition considers flow to resivour as positive
+            else
+                reqFlowRate = -powerReq/pumpPowerCoff;
+            end
+            dT = flowCondition(resD(hourTime),sTair(hourTime),sWz(hourTime), ...
+                rivFlowRate(hourTime),riverT(hourTime),resT(hourTime),resV(hourTime), ...
+                Cp,resMaxRadius,resMaxDepth,sRiverV(hourTime),sSolarRad(hourTime),sRH(hourTime), ...
+                reqFlowRate,pumpPowerCoff,turbPowerCoff);
+            resT(hourTime) =  dT(1); 
+            riverT(hourTime) = dT(2); 
+            resV(hourTime) = dT(3);
+            resD(hourTime) = dT(4);
+        end
+            dT = noFlowCondition(resInitalDepth,sTair(hourTime),sWz(hourTime), ...
+                rivFlowRate(hourTime),riverTControl(hourTime),resTControl(hourTime),resInitalVolume, ...
+                Cp,resMaxRadius,resMaxDepth,sRiverV(hourTime),sSolarRad(hourTime),sRH(hourTime));
+            resTControl(hourTime) =  dT(1); 
+            riverTControl(hourTime) = dT(2);
+
+
+    end
+    
+end
+disp("Calculations Finished!");
+% Prepare hours
+hours = 1:24;
+
+% Ensure variables exist and are row vectors of length 24
+if ~exist('resT','var'), resT = nan(1,24); end
+if ~exist('resTControl','var'), resTControl = nan(1,24); end
+if ~exist('riverT','var'), riverT = nan(1,24); end
+if ~exist('riverTControl','var'), riverTControl = nan(1,24); end
+if ~exist('rivControlTemp','var'), rivControlTemp = nan(1,24); end
+if ~exist('resD','var'), resD = nan(1,24); end
+
+toRow = @(v) reshape(v(1:min(end,24)),1,[]);
+padTo24 = @(v) (numel(v)<24) * [v, repmat(v(end),1,24-numel(v))] + (numel(v)>=24) * v(1:24);
+
+resT = padTo24(toRow(resT));
+resTControl = padTo24(toRow(resTControl));
+riverT = padTo24(toRow(riverT));
+riverTControl = padTo24(toRow(riverTControl));
+rivControlTemp = padTo24(toRow(rivControlTemp));
+resD = padTo24(toRow(resD));
+
+% Create figure with desired layout
+figure('Units','normalized','Position',[0.1 0.1 0.7 0.6]);
+
+% Top-left: resT and resTControl
+subplot(2,2,1);
+plot(hours,resT,'-o','LineWidth',1.5); hold on;
+plot(hours,resTControl,'-','LineWidth',1.5);
+hold off;
+xlabel('Hour');
+ylabel('Reservoir Temp (°C)');
+title('Reservoir Temperature vs Hour');
+legend('resT','resTControl','Location','best');
+xlim([1 24]);
+grid on;
+
+% Bottom-left: riverT, riverTControl, rivControlTemp
+subplot(2,2,3);
+plot(hours,riverT,'-s','LineWidth',1.5); hold on;
+plot(hours,riverTControl,'-','LineWidth',1.5);
+plot(hours,rivControlTemp,'-.','LineWidth',1.5);
+hold off;
+xlabel('Hour');
+ylabel('Temperature (°C)');
+legend('riverT','riverTControl','rivControlTemp','Location','best');
+title('River Temperatures vs Hour');
+xlim([1 24]);
+grid on;
+
+% Right column (merged): reservoir depth
+subplot(2,2,[2 4]);
+plot(hours,resD,'-^','LineWidth',1.5,'Color',[0.85 0.33 0.1]);
+xlabel('Hour');
+ylabel('Reservoir Depth (m)');
+title('Reservoir Depth vs Hour');
+xlim([1 24]);
+grid on;
+
+
+
+% 
+% % Plot results: three graphs against 24 hours
+% hours = 1:24;
+% 
+% % Ensure variables exist and are row vectors of length 24
+% if ~exist('resT','var'), resT = nan(1,24); end
+% if ~exist('riverT','var'), riverT = nan(1,24); end
+% if ~exist('rivControlTemp','var'), rivControlTemp = nan(1,24); end
+% if ~exist('resD','var'), resD = nan(1,24); end
+% resT = reshape(resT(1:min(end,24)),1,[]);
+% riverT = reshape(riverT(1:min(end,24)),1,[]);
+% rivControlTemp = reshape(rivControlTemp(1:min(end,24)),1,[]);
+% resD = reshape(resD(1:min(end,24)),1,[]);
+% 
+% % Pad to length 24 if shorter
+% padTo24 = @(v) (numel(v)<24) * [v, repmat(v(end),1,24-numel(v))] + (numel(v)>=24) * v(1:24);
+% resT = padTo24(resT);
+% riverT = padTo24(riverT);
+% rivControlTemp = padTo24(rivControlTemp);
+% resD = padTo24(resD);
+% 
+% figure('Units','normalized','Position',[0.1 0.1 0.6 0.7]);
+% 
+% % Left column: two stacked plots
+% subplot(2,2,1); % top-left: reservoir temperature
+% plot(hours,resT,'-o','LineWidth',1.5);
+% xlabel('Hour');
+% ylabel('Reservoir Temp (°C)');
+% title('Reservoir Temperature vs Hour');
+% xlim([1 24]);
+% grid on;
+% 
+% subplot(2,2,3); % bottom-left: riverT and rivControlTemp
+% plot(hours,riverT,'-s','LineWidth',1.5); hold on;
+% plot(hours,rivControlTemp,'-','LineWidth',1.5);
+% hold off;
+% xlabel('Hour');
+% ylabel('Temperature (°C)');
+% legend('riverT','rivControlTemp','Location','best');
+% title('River Temp and Control Temp vs Hour');
+% xlim([1 24]);
+% grid on;
+% 
+% % Right: tall vertical plot for resD spanning both rows
+% subplot(2,2,[2 4]); % right column merged
+% plot(hours,resD,'-^','LineWidth',1.5,'Color',[0.85 0.33 0.1]);
+% xlabel('Hour');
+% ylabel('Reservoir Depth (m)');
+% title('Reservoir Depth vs Hour');
+% xlim([1 24]);
+% grid on;
+
+
+
+
+%{
+no flow considerations:
+River temp does not matter, data can be assumed for now for heat exchange
+heat exchange in resivour 
+
+%}
+function out = noFlowCondition(depth,Tair,Wz,riverDischarge,lT,uT,resV,Cp,rMR,rMD,riverV,solarRad,rH)
+    %Preliminary Area Calculations
+    resArea = resAreaCalc(depth,rMR,rMD);
+    riverCrossArea = riverDischarge / riverV; % modeling river as cylinder 
+    riverDia = 2*sqrt(riverCrossArea/pi); % river dia, assume river surface area is 1m x river dia area square.
+    riverSA = riverDia;
+    
+    %Surface Heat Transfer
+ %   disp("Upper exchange")
+    duT = surfaceHeatTransfer(solarRad,Tair,uT,Wz,Cp,resArea,resV,rH); % [°C]
+  %  disp("Lower Exchange")
+    dlT =  surfaceHeatTransfer(solarRad,Tair,lT,Wz,Cp,riverSA,riverCrossArea,rH);
+    %Heat Exchange
+    reT = lT + duT; % new res temp
+    riT = uT + dlT; % new river temp
+    out = [reT,riT];
+end
+
+
+function out = flowCondition(depth,Tair,Wz,riverDischarge,lT,uT,resV,Cp,rMR,rMD,riverV,solarRad,rH, ...
+    flowRate,turbHeatCoff,pumpHeatCoff)
+    %disp(["flowRate: ", flowRate])
+    %Area Calculations
+    newDepth = resDepthCalc(flowRate,depth,rMR,rMD);
+    resArea = resAreaCalc(newDepth,rMR,rMD);
+    newResV = resV + flowRate*15*60; %considering 15 minute intervals
+
+    riverCrossArea = (riverDischarge-flowRate) / riverV; % modeling river as cylinder 
+    riverDia = 2*sqrt(riverCrossArea/pi); % river dia, assume river surface area is 1m x river dia area square.
+    riverSA = riverDia;
+    
+    %Surface Heat Transfer
+    duTSurface = surfaceHeatTransfer(solarRad,Tair,uT,Wz,Cp,resArea,newResV,rH); % [°C]
+    dlTSurface =  surfaceHeatTransfer(solarRad,Tair,lT,Wz,Cp,riverSA,riverCrossArea,rH); 
+    % Considering river depth not to change from resivour flows
+    if flowRate >= 0 % case one, flowing up to the upper resivour
+        % heat transfer model, river ----> pump -----> resivour
+        Qpump = pumpHeatCoff*flowRate*15*60; %[W], 
+        Qriv = (lT-uT)*Cp*flowRate*1000*15*60; %[W] considering 15 min intervals
+        %disp(["Qpump", Qpump,"Qriv",Qriv])
+        Qtotal = Qpump + Qriv;
+        %disp(["pump:", Qtotal])
+        duTPump = Qtotal/(newResV * 1000 *Cp);
+        %disp(["dt Pump", duTPump])
+        duT = duTSurface + duTPump;
+        dlT = dlTSurface;
+    else
+        Qturb = turbHeatCoff*-flowRate*15*60;
+        Qres = (uT-lT)*Cp*flowRate*1000*15*60;
+        disp(["Qturb", Qturb,"Qres",Qres])
+        Qtotal = Qturb + Qres;
+        %disp(["turb:", Qtotal])
+        duTTurb = Qtotal/(riverDischarge*15*60 * 1000 *Cp);
+        disp(["dt Pump", duTTurb])
+        duT = duTSurface;
+        dlT = dlTSurface + duTTurb;
+    end
+    
+    reT = lT + duT; % new res temp
+    riT = uT + dlT; % new river temp
+    out = [reT,riT,newResV,newDepth];
+
+
+end
+
+
+%% ----------------
+% 4. Background Functions
+%% ----------------
+% note, considers 15 minute intervals between
+function out = surfaceHeatTransfer(solarRad,Tair,Ts,Wz,Cp,surfaceArea,volume,rH)
+    heatExchange = solarRad + surfaceOutput(Tair,Ts,Wz,rH,0.5);
+    %disp(["solarRad: ",solarRad, "surfaceEvap", heatExchange - solarRad])
+    Q = heatExchange*surfaceArea*60*15;
+    out = Q/(volume * 1000 *Cp);
+end
+
+
+
+
+
+
+function out = resDepthCalc(flowRate,depth,resMaxRadius,resMaxDepth) % changes depth depending on flow rate to deter
+    Vder = pi * (resMaxRadius^2)/(resMaxDepth^2) * depth * (2*resMaxDepth - depth);
+    out = depth - (flowRate)/Vder;
+end
+function out = resRadCalc(depth,rMR,rMD)
+    out = rMR*sqrt(1 - ((rMD - depth)^2 / rMD^2)); % for whatever reason resMaxRadius is not defined??
+
+end
+function out = resAreaCalc(d,rMR,rMD)
+    out = pi*(rMR^2) * (1 - ((rMD - d)^2 / rMD^2));
+end
+function out = resVolumeCalc(d,r)
+    out = (4/6)*(r^2)*d*pi;
+end
+function out = powerOutputSimpleSchedule(hourTime)
+    out = 750*cos((pi/12) * hourTime + 14.5);
+end
