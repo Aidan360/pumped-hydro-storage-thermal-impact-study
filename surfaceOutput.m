@@ -1,12 +1,3 @@
-%mat lab timeeee
-
-% the model is working. when that happens i should make a code interpolater
-% for everything 
-%  Test = surfaceOutput(0,-121.190,45.608,50,15,12,2026,4,-8, 18.3, 15.4,3, 30)
-% short wave is by sun, long wave is radiation from the earths atmosphere 
-%7:00 - 10:45, 11 - 11:45 probably  
-
-
 % cloudiness has a range of 0 - 1
 % swRad model is either EPA or MBH 
 % long and lat in degrees 
@@ -20,6 +11,13 @@
 % rZ is relative depth to surface, if its zero its considered surface, if
 % not then it uses shortwave penetration
 % wind speed units are m/s
+
+
+%7 - 10, monday 10:45 - 10:45
+% tues 8 - 12
+% wed 8 - 12 
+% thurs 8 - 12 
+
 %%
 % hStor = zeros(1,24);
 % for h = 1:24
@@ -34,40 +32,40 @@
 % grid on
 %G = graph(hStor,1:23);
 %plot(G)
-function output = surfaceOutput(Tair, Ts, Wz,rH,cloudiness)  
-    es = saturationVaporPressureCalc(Tair);
-    ea = vaporPressure(rH,es);
-    br = bRCalc(Ts);
-    e = evapCalcGenModel(Wz,es,ea);
-    c = conductionGenModel(Wz,Tair,Ts);
-    an = lwRCalc(Tair,cloudiness);
-  %  disp(["an",an,"br",br,"e",e,"c",c])
-    
-    output = an-br-e-c;
-end
-% im going to cry
-% function output = surfaceOutput(cloudiness,long,lat,z,Jday,HOUR,year,month,TZ, Tair, Ts, Wz, RH)
+% function output = surfaceOutput(Tair, Ts, Wz,rH,cloudiness)  
 %     es = saturationVaporPressureCalc(Tair);
-%     ea = vaporPressure(RH,es);
-%     Tdpt = dewPointTempCalc(ea);
-%     Ba = 0.84; %Ba is recommended to be 0.84
-%     K1 = 0.1; %K1 is recommended to be 0.1 unless more data is available
-%     %We're going to assume its in the pacific north west?? so ta038 and
-%     %ta050 will be 0.1 and 0.05 (mt vernon stuff)
-%     ta038 = 0.05;
-%     ta050 = 0.1;
-%     s = pswMBHcalc(cloudiness,Ba,K1,ta038,ta050,long,lat,Tdpt,z,Jday,HOUR,year,month,TZ); 
-% 
-%     an = lwRCalc(Tair,cloudiness);
+%     ea = vaporPressure(rH,es);
 %     br = bRCalc(Ts);
 %     e = evapCalcGenModel(Wz,es,ea);
 %     c = conductionGenModel(Wz,Tair,Ts);
-%     output = s + an - br - e - c;
+%     an = lwRCalc(Tair,cloudiness);
+%   %  disp(["an",an,"br",br,"e",e,"c",c])
+% 
+%     output = an-br-e-c;
 % end
-%
+% im going to cry
+function output = surfaceOutput(Tair, Ts, Wz, RH, cloudiness,long,lat,z,Jday,HOUR,yearS,monthS,TZ)
+    es = saturationVaporPressureCalc(Tair);
+    ea = vaporPressure(RH,es);
+    Tdpt = dewPointTempCalc(ea);
+    Ba = 0.84; %Ba is recommended to be 0.84
+    K1 = 0.1; %K1 is recommended to be 0.1 unless more data is available
+    %We're going to assume its in the pacific north west?? so ta038 and
+    %ta050 will be 0.1 and 0.05 (mt vernon stuff)
+    ta038 = 0.05;
+    ta050 = 0.1;
+    s = pswMBHcalc(cloudiness,Ba,K1,ta038,ta050,long,lat,Tdpt,z,Jday,HOUR,yearS,monthS,TZ); 
+
+    an = lwRCalc(Tair,cloudiness);
+    br = bRCalc(Ts);
+    e = evapCalcGenModel(Wz,es,ea);
+    c = conductionGenModel(Wz,Tair,Ts);
+    output = s + an - br - e - c;
+end
 
 
-function out = pswMBHcalc(cloudiness,Ba,K1,ta038,ta050,long,lat,Tdpt,z,dayIn,HOUR,year,month,TZ)
+
+function out = pswMBHcalc(cloudiness,Ba,K1,ta038,ta050,long,lat,Tdpt,z,dayIn,HOUR,yearS,monthS,TZ)
 % Patched swMBHcalc with defensive checks to avoid unexpected complex values.
 % Assumptions:
 % - lat and long are given in degrees (converted to radians internally).
@@ -96,13 +94,13 @@ function out = pswMBHcalc(cloudiness,Ba,K1,ta038,ta050,long,lat,Tdpt,z,dayIn,HOU
     % Time and Julian date calculations
     day = dayIn - TZ/24;
     DD = day + HOUR/24;
-    if year <= 2
-        year = year - 1;
-        month = month + 12;
+    if yearS <= 2
+        yearS = yearS - 1;
+        monthS = monthS + 12;
     end
-    Ajd = floor(year/100);
+    Ajd = floor(yearS/100);
     Bjd = 2 - Ajd + floor(Ajd/4.0);
-    JD = floor(365.25*(year + 4716.0)) + floor(30.6001*(month + 1)) + DD + Bjd - 1524.5;
+    JD = floor(365.25*(yearS + 4716.0)) + floor(30.6001*(monthS + 1)) + DD + Bjd - 1524.5;
     t = (JD - 2451545.0) / 36525.0;
 
     % Orbital elements (these are in degrees per Meeus-style form)
@@ -250,18 +248,41 @@ function out = pswMBHcalc(cloudiness,Ba,K1,ta038,ta050,long,lat,Tdpt,z,dayIn,HOU
     checkc('Ias', Ias);
     checkc('directHz', directHz);
 
-    % Set RtA and RtB based on cloudiness (fix typo: use cloudiness consistently)
-    if isequal(cloudiness,0)
+    % Set RtA and RtB based on cloudiness (fix typo: use cloudiness
+    % consistently) cloud 0 is low, cloud 1 is high
+    if isequal(cloudiness(1),0) && isequal(cloudiness(2),0)
         RtA = 1.18; RtB = -0.77;
-    elseif cloudiness >= 0.01 && cloudiness <= 0.59
-        RtA = 2.20; RtB = -0.97;
-    elseif cloudiness >= 0.6 && cloudiness <= 0.99
-        RtA = 0.95; RtB = -0.75;
-    elseif isequal(cloudiness,1)
-        RtA = 0.33; RtB = -0.45;
     else
-        error('cloudiness must be 0, in [0.1,0.5], in [0.6,0.9], or 1.');
+        if cloudiness(1) >= 0.01 && cloudiness(1) <= 0.59
+            LRtA = 2.17; LRtB = -0.96;
+        elseif cloudiness(1) >= 0.6 && cloudiness(1) <= 0.99
+            LRtA = 0.78; LRtB = -0.68;
+        elseif isequal(cloudiness(1),1)
+            LRtA = 0.20; LRtB = -0.30;
+        else
+            LRtA = 1.18; LRtB = -0.77;
+        end
+        if cloudiness(2) >= 0.01 && cloudiness(2) <= 0.59
+            HRtA = 2.20; HRtB = -0.98;
+        elseif cloudiness(2) >= 0.6 && cloudiness(2) <= 0.99
+            HRtA = 1.10; HRtB = -0.80;
+        elseif isequal(cloudiness(2),1)
+            HRtA = 0.51; HRtB = -0.58;
+        else
+            HRtA = 1.18; HRtB = -0.77;
+        end
+        RtA = max([LRtA,HRtA]); RtB = max([LRtB,HRtB]);
     end
+        % 
+    % elseif cloudiness >= 0.01 && cloudiness <= 0.59
+    %     RtA = 2.20; RtB = -0.97;
+    % elseif cloudiness >= 0.6 && cloudiness <= 0.99
+    %     RtA = 0.95; RtB = -0.75;
+    % elseif isequal(cloudiness,1)
+    %     RtA = 0.33; RtB = -0.45;
+    % else
+    %     error('cloudiness must be 0, in [0.1,0.5], in [0.6,0.9], or 1.');
+    
 
     % Surface reflectivity Rt, use Ao in degrees in exponent as original
     Rt = RtA .* (rad2deg(Ao)).^RtB;
@@ -282,7 +303,7 @@ function out = pswMBHcalc(cloudiness,Ba,K1,ta038,ta050,long,lat,Tdpt,z,dayIn,HOU
         end
     end
 end
-function out = swMBHcalc(cloudiness,Ba,K1,ta038,ta050,long,lat,Tdpt,z,dayIn,HOUR,year,month,TZ) % shortwave solar radtion model from Meeus, Bird and hulstrom models
+function out = swMBHcalc(cloudiness,Ba,K1,ta038,ta050,long,lat,Tdpt,z,dayIn,HOUR,yearS,month,TZ) % shortwave solar radtion model from Meeus, Bird and hulstrom models
    
     day = dayIn - TZ/24; % Jday is julian day, TZ is time zone adjusted to GMT
     DD = day + HOUR/24;
@@ -391,7 +412,7 @@ function out = lwRCalc(Tair,cloudiness) %  net long wave radiation formula.
         Oac = sigma*((Tair + 273)^4) * (1 - 0.261 * exp((-7.77 * 10^-4)*Tair^2));
     end
     k = 0.17;
-    out = Oac*(1+k*cloudiness^2) * 0.97; % C is for cloudniess which can be from 0 to 1. 
+    out = Oac*(1+k*max(cloudiness)^2) * 0.97; % C is for cloudniess which can be from 0 to 1. 
 end
 %%
 function out = bRCalc(Ts) % back radiation 
