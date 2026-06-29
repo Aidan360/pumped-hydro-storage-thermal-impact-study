@@ -9,9 +9,17 @@ clear; clc;
 % INPUTS
 %% -------------------------
 % Time inputs
-% MAX DATA RANGE 3/13/2025 19:00 - 9/24/2025 15:00
+% MAX DATA RANGE
+% 2025: 3/13/2025 19:00 - 9/24/2025 15:00
+
+csvDat = 'Dalles2025FilteredData_table.csv';
 startTime = datetime('3/13/2025 19:00', Format  = 'MM-dd-uuuu HH:mm');
 endTime = datetime('9/24/2025 15:00', Format  = 'MM-dd-uuuu HH:mm');
+%csvDat = 'Dalles2025FilteredData_table.csv'
+% 2024: 3/27/24 16:00 -  9/24/24 19:00
+% csvDat = 'Dalles2024FilteredData_table.csv';
+% startTime = datetime('3/27/2024 16:00', Format  = 'MM-dd-uuuu HH:mm');
+% endTime = datetime('9/24/2024 19:00', Format  = 'MM-dd-uuuu HH:mm');
 
 %% DAM PARAMETERS
 spillwayCrest = 121; %{Ft]
@@ -32,7 +40,7 @@ riverDir = 319.59; %[riverDirection]
 
 
 
-Tf = readtable('DallesFilteredData_table.csv'); % filtered data
+Tf = readtable(csvDat); % filtered data
 any(isnan(Tf{:,2}), 'all')
 timeVar = Tf{:,1};
 Tair =  Tf{:,2}; %[m^3/s]
@@ -42,11 +50,11 @@ inflow = Tf{:,5}; %[m^3/s]
 outflow = Tf{:,6}; %[m^3/s]
 discharge = Tf{:,7}; %[m^3/s]
 downstreamWaterVelocity = Tf{:,8};
-wZ = Tf{:,9}; %[m/s]
-rH = Tf{:,10}; %[%]
-lowCloud = Tf{:,11}; 
-highCloud = Tf{:,12};
-gaugeHeight = Tf{:,13}; %[ft]
+gaugeHeight = Tf{:,9}; %[ft]
+wZ = Tf{:,10}; %[m/s]
+rH = Tf{:,11}; %[%]
+lowCloud = Tf{:,12}; 
+highCloud = Tf{:,13};
 damElevation =  Tf{:,14}; %[ft]
 damStorage = Tf{:,15}; %[acre*ft]
 rain = Tf{:,16}; %{mm]
@@ -458,9 +466,11 @@ function out = flowCondition(rMR,resMaxDepth,riverBottom,Cp,waterDensity,turbHea
         duTdiff = Qres/(riverDischarge*15*60 * waterDensity *Cp);
         duT = duTSurface + duTInflow;
         dlT = dlTSurface + duTTurb+duTdiff;
-    
+        if any(isnan([duT, duTSurface, duTInflow, dlTSurface, duTTurb,duTdiff]), 'all')
+            warning('NaN detected at exhange functions');
+            keyboard
+        end
    end
-    
     reT = lT + duT; % new res temp
     riT = uT + dlT; % new river temp
     out = [reT,riT,newResV,newDepth,duTSurface,duTInflow,duTTurb,duTPump,duTdiff,duT,dlT];
@@ -539,8 +549,11 @@ end
 % 5. Plotting and post processing
 %% ----------------
 hours = 1:totalSteps;
-upperDiff = abs(monitorUpperTemp - resT);
-lowerDiff = abs(monitorLowerTemp - riverT);
+upperDiff = (monitorUpperTemp - resT);
+lowerDiff = (monitorLowerTemp - riverT);
+disp("var test")
+disp(mean(upperDiff))
+disp(mean(lowerDiff))
 
 % Compute coefficient of determination (R^2) between monitored and modeled temps
 % for upper (monitorUpperTemp vs resT) and lower (monitorLowerTemp vs riverT).
@@ -582,107 +595,107 @@ end
 % Display results in console
 fprintf('R^2 (upper: monitor vs resT) = %.4f\n', R2_upper);
 fprintf('R^2 (lower: monitor vs riverT) = %.4f\n', R2_lower);
-
-
-% Detailed statistical analysis between monitored and modeled temperatures
-% for upper (monitorUpperTemp vs resT) and lower (monitorLowerTemp vs riverT)
-
-% Prepare vectors (column vectors) and align to totalSteps
-u_obs_full = monitorUpperTemp(:);
-u_pred_full = resT(:);
-l_obs_full = monitorLowerTemp(:);
-l_pred_full = riverT(:);
-
-n = totalSteps;
-u_obs_full = u_obs_full(1:min(end,n));
-u_pred_full = u_pred_full(1:min(end,n));
-l_obs_full = l_obs_full(1:min(end,n));
-l_pred_full = l_pred_full(1:min(end,n));
-
-% Remove NaN pairs
-validU = ~isnan(u_obs_full) & ~isnan(u_pred_full);
-validL = ~isnan(l_obs_full) & ~isnan(l_pred_full);
-
-% Helper to compute stats
-computeStats = @(obs,pred) struct( ...
-    'N', sum(~isnan(obs) & ~isnan(pred)), ...
-    'mean_obs', mean(obs,'omitnan'), ...
-    'mean_pred', mean(pred,'omitnan'), ...
-    'bias', mean(pred-obs,'omitnan'), ...              % mean error
-    'MAE', mean(abs(pred-obs),'omitnan'), ...          % mean absolute error
-    'RMSE', sqrt(mean((pred-obs).^2,'omitnan')), ...  % root mean squared error
-    'R2', 1 - sum((obs-pred).^2,'omitnan')/sum((obs-mean(obs,'omitnan')).^2,'omitnan'), ...
-    'pearson_r', corr(obs,pred,'rows','complete'), ...
-    'spearman_rho', corr(obs,pred,'Type','Spearman','Rows','complete') ...
-    );
-
-if any(validU)
-    statsU = computeStats(u_obs_full(validU), u_pred_full(validU));
-else
-    statsU = [];
-end
-
-if any(validL)
-    statsL = computeStats(l_obs_full(validL), l_pred_full(validL));
-else
-    statsL = [];
-end
-
-% Additional diagnostics: linear regression fit and Bland-Altman
-regressionFit = @(obs,pred) struct( ...
-    'coeff', polyfit(obs,pred,1), ... % fit pred = a*obs + b
-    'residuals', pred - polyval(polyfit(obs,pred,1),obs) ...
-    );
-
-blandAltman = @(obs,pred) struct( ...
-    'mean_diff', mean(pred-obs,'omitnan'), ...
-    'sd_diff', std(pred-obs,'omitnan'), ...
-    'upper_LOA', mean(pred-obs,'omitnan') + 1.96*std(pred-obs,'omitnan'), ...
-    'lower_LOA', mean(pred-obs,'omitnan') - 1.96*std(pred-obs,'omitnan') ...
-    );
-
-if any(validU)
-    regU = regressionFit(u_obs_full(validU), u_pred_full(validU));
-    baU = blandAltman(u_obs_full(validU), u_pred_full(validU));
-else
-    regU = [];
-    baU = [];
-end
-
-if any(validL)
-    regL = regressionFit(l_obs_full(validL), l_pred_full(validL));
-    baL = blandAltman(l_obs_full(validL), l_pred_full(validL));
-else
-    regL = [];
-    baL = [];
-end
-
-% Display results to console
-fprintf('\nDetailed statistical analysis: Upper (monitorUpperTemp vs resT)\n');
-if ~isempty(statsU)
-    fprintf('N = %d\n', statsU.N);
-    fprintf('Mean observed = %.3f, Mean predicted = %.3f\n', statsU.mean_obs, statsU.mean_pred);
-    fprintf('Bias (pred - obs) = %.3f\n', statsU.bias);
-    fprintf('MAE = %.3f, RMSE = %.3f\n', statsU.MAE, statsU.RMSE);
-    fprintf('R^2 = %.4f, Pearson r = %.4f, Spearman rho = %.4f\n', statsU.R2, statsU.pearson_r, statsU.spearman_rho);
-    fprintf('Linear fit (pred = a*obs + b): a = %.4f, b = %.4f\n', regU.coeff(1), regU.coeff(2));
-    fprintf('Bland-Altman: mean diff = %.4f, SD diff = %.4f, LOA = [%.4f, %.4f]\n', baU.mean_diff, baU.sd_diff, baU.lower_LOA, baU.upper_LOA);
-else
-    fprintf('No valid paired data for upper comparison.\n');
-end
-
-fprintf('\nDetailed statistical analysis: Lower (monitorLowerTemp vs riverT)\n');
-if ~isempty(statsL)
-    fprintf('N = %d\n', statsL.N);
-    fprintf('Mean observed = %.3f, Mean predicted = %.3f\n', statsL.mean_obs, statsL.mean_pred);
-    fprintf('Bias (pred - obs) = %.3f\n', statsL.bias);
-    fprintf('MAE = %.3f, RMSE = %.3f\n', statsL.MAE, statsL.RMSE);
-    fprintf('R^2 = %.4f, Pearson r = %.4f, Spearman rho = %.4f\n', statsL.R2, statsL.pearson_r, statsL.spearman_rho);
-    fprintf('Linear fit (pred = a*obs + b): a = %.4f, b = %.4f\n', regL.coeff(1), regL.coeff(2));
-    fprintf('Bland-Altman: mean diff = %.4f, SD diff = %.4f, LOA = [%.4f, %.4f]\n', baL.mean_diff, baL.sd_diff, baL.lower_LOA, baL.upper_LOA);
-else
-    fprintf('No valid paired data for lower comparison.\n');
-end
+% 
+% 
+% % Detailed statistical analysis between monitored and modeled temperatures
+% % for upper (monitorUpperTemp vs resT) and lower (monitorLowerTemp vs riverT)
+% 
+% % Prepare vectors (column vectors) and align to totalSteps
+% u_obs_full = monitorUpperTemp(:);
+% u_pred_full = resT(:);
+% l_obs_full = monitorLowerTemp(:);
+% l_pred_full = riverT(:);
+% 
+% n = totalSteps;
+% u_obs_full = u_obs_full(1:min(end,n));
+% u_pred_full = u_pred_full(1:min(end,n));
+% l_obs_full = l_obs_full(1:min(end,n));
+% l_pred_full = l_pred_full(1:min(end,n));
+% 
+% % Remove NaN pairs
+% validU = ~isnan(u_obs_full) & ~isnan(u_pred_full);
+% validL = ~isnan(l_obs_full) & ~isnan(l_pred_full);
+% 
+% % Helper to compute stats
+% computeStats = @(obs,pred) struct( ...
+%     'N', sum(~isnan(obs) & ~isnan(pred)), ...
+%     'mean_obs', mean(obs,'omitnan'), ...
+%     'mean_pred', mean(pred,'omitnan'), ...
+%     'bias', mean(pred-obs,'omitnan'), ...              % mean error
+%     'MAE', mean(abs(pred-obs),'omitnan'), ...          % mean absolute error
+%     'RMSE', sqrt(mean((pred-obs).^2,'omitnan')), ...  % root mean squared error
+%     'R2', 1 - sum((obs-pred).^2,'omitnan')/sum((obs-mean(obs,'omitnan')).^2,'omitnan'), ...
+%     'pearson_r', corr(obs,pred,'rows','complete'), ...
+%     'spearman_rho', corr(obs,pred,'Type','Spearman','Rows','complete') ...
+%     );
+% 
+% if any(validU)
+%     statsU = computeStats(u_obs_full(validU), u_pred_full(validU));
+% else
+%     statsU = [];
+% end
+% 
+% if any(validL)
+%     statsL = computeStats(l_obs_full(validL), l_pred_full(validL));
+% else
+%     statsL = [];
+% end
+% 
+% % Additional diagnostics: linear regression fit and Bland-Altman
+% regressionFit = @(obs,pred) struct( ...
+%     'coeff', polyfit(obs,pred,1), ... % fit pred = a*obs + b
+%     'residuals', pred - polyval(polyfit(obs,pred,1),obs) ...
+%     );
+% 
+% blandAltman = @(obs,pred) struct( ...
+%     'mean_diff', mean(pred-obs,'omitnan'), ...
+%     'sd_diff', std(pred-obs,'omitnan'), ...
+%     'upper_LOA', mean(pred-obs,'omitnan') + 1.96*std(pred-obs,'omitnan'), ...
+%     'lower_LOA', mean(pred-obs,'omitnan') - 1.96*std(pred-obs,'omitnan') ...
+%     );
+% 
+% if any(validU)
+%     regU = regressionFit(u_obs_full(validU), u_pred_full(validU));
+%     baU = blandAltman(u_obs_full(validU), u_pred_full(validU));
+% else
+%     regU = [];
+%     baU = [];
+% end
+% 
+% if any(validL)
+%     regL = regressionFit(l_obs_full(validL), l_pred_full(validL));
+%     baL = blandAltman(l_obs_full(validL), l_pred_full(validL));
+% else
+%     regL = [];
+%     baL = [];
+% end
+% 
+% % Display results to console
+% fprintf('\nDetailed statistical analysis: Upper (monitorUpperTemp vs resT)\n');
+% if ~isempty(statsU)
+%     fprintf('N = %d\n', statsU.N);
+%     fprintf('Mean observed = %.3f, Mean predicted = %.3f\n', statsU.mean_obs, statsU.mean_pred);
+%     fprintf('Bias (pred - obs) = %.3f\n', statsU.bias);
+%     fprintf('MAE = %.3f, RMSE = %.3f\n', statsU.MAE, statsU.RMSE);
+%     fprintf('R^2 = %.4f, Pearson r = %.4f, Spearman rho = %.4f\n', statsU.R2, statsU.pearson_r, statsU.spearman_rho);
+%     fprintf('Linear fit (pred = a*obs + b): a = %.4f, b = %.4f\n', regU.coeff(1), regU.coeff(2));
+%     fprintf('Bland-Altman: mean diff = %.4f, SD diff = %.4f, LOA = [%.4f, %.4f]\n', baU.mean_diff, baU.sd_diff, baU.lower_LOA, baU.upper_LOA);
+% else
+%     fprintf('No valid paired data for upper comparison.\n');
+% end
+% 
+% fprintf('\nDetailed statistical analysis: Lower (monitorLowerTemp vs riverT)\n');
+% if ~isempty(statsL)
+%     fprintf('N = %d\n', statsL.N);
+%     fprintf('Mean observed = %.3f, Mean predicted = %.3f\n', statsL.mean_obs, statsL.mean_pred);
+%     fprintf('Bias (pred - obs) = %.3f\n', statsL.bias);
+%     fprintf('MAE = %.3f, RMSE = %.3f\n', statsL.MAE, statsL.RMSE);
+%     fprintf('R^2 = %.4f, Pearson r = %.4f, Spearman rho = %.4f\n', statsL.R2, statsL.pearson_r, statsL.spearman_rho);
+%     fprintf('Linear fit (pred = a*obs + b): a = %.4f, b = %.4f\n', regL.coeff(1), regL.coeff(2));
+%     fprintf('Bland-Altman: mean diff = %.4f, SD diff = %.4f, LOA = [%.4f, %.4f]\n', baL.mean_diff, baL.sd_diff, baL.lower_LOA, baL.upper_LOA);
+% else
+%     fprintf('No valid paired data for lower comparison.\n');
+% end
 
 % Ensure variables exist and are row vectors of length 24
 %if ~exist('resT','var'), resT = nan(1,totalSteps); end

@@ -12,11 +12,8 @@
 % not then it uses shortwave penetration
 % wind speed units are m/s
 
+%mon, 8 - 
 
-%7 - 10, monday 10:45 - 10:45
-% tues 8 - 12
-% wed 8 - 12 
-% thurs 8 - 12 
 
 %%
 % hStor = zeros(1,24);
@@ -60,6 +57,10 @@ function output = surfaceOutput(Tair, Ts, Wz, RH, cloudiness,long,lat,z,Jday,HOU
     br = bRCalc(Ts);
     e = evapCalcGenModel(Wz,es,ea);
     c = conductionGenModel(Wz,Tair,Ts);
+    if any(isnan([s, an, br, e, c]), 'all')
+       warning('NaN detected at heat functions');
+       keyboard
+    end
     output = s + an - br - e - c;
 end
 
@@ -71,7 +72,10 @@ function out = pswMBHcalc(cloudiness,Ba,K1,ta038,ta050,long,lat,Tdpt,z,dayIn,HOU
 % - lat and long are given in degrees (converted to radians internally).
 % - dayIn, HOUR, year, month, TZ as before.
 % Returns out = 0 when sun is below horizon or numerics invalid.
-
+    if any(isnan([cloudiness, long, lat, Tdpt]), 'all')
+       warning('NaN detected at surface shortwave inputs functions');
+       keyboard
+    end
     % Small tolerances
     TOL = 1e-12;
     MIN_POS = eps;
@@ -245,6 +249,7 @@ function out = pswMBHcalc(cloudiness,Ba,K1,ta038,ta050,long,lat,Tdpt,z,dayIn,HOU
 
     Ias = 0.79 .* Oext .* Taa .* Tw .* Tum .* To .* ( (0.5*(1 - Tr) + Ba.*(1 - Ta./Taa)) ./ (1 - mp + mp.^1.02) );
     directHz = 0.9662 .* Oext .* Ta .* Tw .* Tum .* To .* Tr;
+    
     checkc('Ias', Ias);
     checkc('directHz', directHz);
 
@@ -290,7 +295,10 @@ function out = pswMBHcalc(cloudiness,Ba,K1,ta038,ta050,long,lat,Tdpt,z,dayIn,HOU
     if abs(denom_out) < TOL
         denom_out = sign(denom_out) * TOL;
     end
-
+    if any(isnan([denom_out, directHz, Ias]), 'all')
+            warning('NaN detected at exhange functions');
+            keyboard
+    end
     out = (directHz + Ias) ./ denom_out;
     % Force any tiny imaginary parts to zero if numerically insignificant
     if ~isreal(out)
@@ -375,7 +383,10 @@ function out = swMBHcalc(cloudiness,Ba,K1,ta038,ta050,long,lat,Tdpt,z,dayIn,HOUR
     % disp(["Taa: ", Taa])
    % rs = 0.0685+(1-Ba)*(1.0-Ta/Taa); % Albedo (dimensionless), Ba is found from table 0.84 is recommended but can change demning on situation
     rs = 0.3;
-    
+    if any(isnan([directHz, Ias, duTInflow, dlTSurface, duTTurb,duTdiff]), 'all')
+            warning('NaN detected at exhange functions');
+            keyboard
+    end
     
     Ias = 0.79*Oext*Taa*Tw*Tum*To*   ( (0.5*( 1 - Tr ) + Ba*(1 - Ta/Taa))/(1 - mp + mp^1.02)); % scattered solar radiation
     directHz = 0.9662*Oext*Ta*Tw*Tum*To*Tr; % direct solar radiation
@@ -423,17 +434,33 @@ end
 %%
 function out = saturationVaporPressureCalc(Tair)
     eJ = exp((17.625 * Tair)/(Tair + 243.04));
+    if eJ == 0
+       warning('NaN detected at saturationPressure');
+       keyboard
+    end
     out = 6.1094*eJ; % From August Roche Magnus formula, assuming it temps don't go below freezing (uh oh)
 end
 function out = vaporPressure(RH,eS)
+    vP = eS * (RH/100);
+    if vP == 0
+       warning('NaN detected at vaporPressure');
+       keyboard
+    end
     out = eS * (RH/100);
+    
 end
 
 function out = dewPointTempCalc(vapPressure) % from Magnus formula 
     alpha = 6.112; % in hPa
     beta =  17.63; % constant
     Lambda = 243.12; % in Celcius
-    out = (Lambda) * log(vapPressure/alpha) / (beta - log(vapPressure/alpha));
+    denom = (beta - log(vapPressure/alpha));
+    test = (Lambda) * log(vapPressure/alpha) / denom;
+    if any(isnan([vapPressure,denom,test]), 'all')
+       warning('NaN detected at dew point');
+       keyboard
+    end
+    out = test;
 end
 %%
 

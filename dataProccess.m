@@ -6,40 +6,138 @@
 % =========================================================
 clear; clc;
 % MAX DATA RANGE 3/13/2025 19:00 - 9/24/2025 15:00
-startTime = datetime('3/13/2025 19:00', Format  = 'MM-dd-uuuu HH:mm');
+startTime = datetime('4/5/2023 23:00', Format  = 'MM-dd-uuuu HH:mm');
 %endTime = datetime('3/13/2025 23:00', Format  = 'MM-dd-uuuu HH:mm');
-endTime = datetime('9/24/2025 15:00', Format  = 'MM-dd-uuuu HH:mm');
-csvFile = 'Dalles2024FilteredData_table.csv';
+endTime = datetime('9/19/2023 19:00', Format  = 'MM-dd-uuuu HH:mm');
+csvFile = 'Dalles2023FilteredData_table.csv';
 % copy and paste all data points for ai usage:
 %upstreamTemp inflow outflow discharge downstreamWaterVelocity wZ rH
 %lowCloud highCloud gaugeHeight damElevation damStorage precipitation windDirection
+datFile = 'Dalles2023.xlsx';
+% 2025 data range 3/13/2025 19:00 - 9/24/2025 15:00
+% 2024 data range 3/27/24 16:00 -  9/24/24 19:00
+% 2023 data range 4/5/23 23:00 - 9/19/23 19:00
 
-upstreamTemp = tableProcess(readtable('Dalles2025.xlsx','Sheet',5),2,3); %[C] f
-downstreamTemp = tableProcess(readtable('Dalles2025.xlsx','Sheet',1),2,3); %[C]f
-inflow = tableProcess(readtable('Dalles2025.xlsx','Sheet',6),2,4); %[m^3/s] f
-outflow = tableProcess(readtable('Dalles2025.xlsx','Sheet',3),2,5); %[m^3/s] f
-discharge = tableProcess(readtable('Dalles2025.xlsx','Sheet',7),2,4); %[m^3/s] f
-Tair = tableProcess(readtable('Dalles2025.xlsx','Sheet',10),1,2); %[m^3/s] f
-rH = tableProcess(readtable('Dalles2025.xlsx','Sheet',10),1,3); %[%] f
-wZ = tableProcess(readtable('Dalles2025.xlsx','Sheet',9),1,5); %[m/s] f
-% skyc1 = tableProcess(readtable('Dalles2025.xlsx','Sheet',10),1,5); 
-% skyc2 = tableProcess(readtable('Dalles2025.xlsx','Sheet',10),1,6);
-% skyc3 = tableProcess(readtable('Dalles2025.xlsx','Sheet',10),1,7); 
-downstreamWaterVelocity = tableProcess(readtable('Dalles2025.xlsx','Sheet',2),2,5); 
-gaugeHeight = tableProcess(readtable('Dalles2025.xlsx','Sheet',4),2,5); 
-damElevation = tableProcess(readtable('elevation_raw.csv'),2,4);
-damStorage = tableProcess(readtable('storage_raw.csv'),2,4);
-precipitation = tableProcess(readtable('Dalles2025Updated.xlsx','Sheet',13),3,4);
-windDirection = tableProcess(readtable('Dalles2025Updated.xlsx','Sheet',12),4,5);
+upstreamTemp = tableProcess(readtable(datFile,'Sheet',5),2,3); %5
+downstreamTemp = tableProcess(readtable(datFile,'Sheet',4),2,3); %4
+inflow = tableProcess(readtable(datFile,'Sheet',8),2,4); %8
+outflow = tableProcess(readtable(datFile,'Sheet',2),2,4); %2
+discharge = tableProcess(readtable(datFile,'Sheet',9),2,4); %9
+Tair = tableProcess(readtable(datFile,'Sheet',10),1,2); %10
+rH = tableProcess(readtable(datFile,'Sheet',11),1,2); %11
+wZ = tableProcess(readtable(datFile,'Sheet',13),1,3); %13
+skyc1 = tableProcess(readtable(datFile,'Sheet',15),1,4); %15
+skyc2 = tableProcess(readtable(datFile,'Sheet',15),1,5); %15
+skyc3 = tableProcess(readtable(datFile,'Sheet',15),1,6); %15
+downstreamWaterVelocity = tableProcess(readtable(datFile,'Sheet',3),2,4);  %3
+gaugeHeight = tableProcess(readtable(datFile,'Sheet',1),2,4); % 1  
+damElevation = tableProcess(readtable(datFile,'Sheet',7),2,4);  %7
+damStorage = tableProcess(readtable(datFile,'Sheet',6),2,4);%6
+precipitation = tableProcess(readtable(datFile,'Sheet',14),1,2); % 14
+windDirection = tableProcess(readtable(datFile,'Sheet',12),1,2); % 12
+
+
+
+disp("data loaded!")
+
+
 
 
 function outputTable = tableProcess(inputArray,timeLoc,dataLoc) % all arrays are processed Tvar Dvar
     inputT = inputArray{:,timeLoc};
-    inputT = datetime(inputT);
+    inputT = datetime(inputT, Format  = 'MM-dd-yy HH:mm');
     inputV = inputArray{:,dataLoc};
+    
+    % Remove rows where either time or value is missing/empty
+    % Handle empty strings in cell/char/string arrays for inputV and NaT for inputT
+    % Create logical mask of valid time entries
+    if isdatetime(inputT)
+        validT = ~isnat(inputT);
+    else
+        validT = ~ismissing(inputT);
+    end
+
+    % Create logical mask of valid value entries
+    if isnumeric(inputV)
+        validV = ~isnan(inputV);
+    elseif iscell(inputV)
+        % cell may contain empty '', <missing>, or NaN
+        validV = true(size(inputV));
+        for ii = 1:numel(inputV)
+            v = inputV{ii};
+            if isempty(v) || (ischar(v) && all(isspace(v))) || (isstring(v) && strlength(v) == 0)
+                validV(ii) = false;
+            elseif (isnumeric(v) && isnan(v)) || isequal(v,missing)
+                validV(ii) = false;
+            end
+        end
+    elseif isstring(inputV) || ischar(inputV)
+        validV = ~ismissing(inputV) & strlength(string(inputV))>0;
+    else
+        % fallback: use ismissing
+        validV = ~ismissing(inputV);
+    end
+
+    % Combine masks and apply to both arrays
+    valid = validT & validV;
+    inputT = inputT(valid);
+    inputV = inputV(valid);
     if (inputT(end) - inputT(1)) < 0 % checks if its orded last to first 
         inputT = rot90(inputT,2);
         inputV = rot90(inputV,2);
+    end
+    if isnumeric(inputV) ~= true
+       
+        if iscell(inputV)
+            % Convert cell column that contains scalar numeric entries (possibly as strings)
+            % into a numeric column vector.
+            % Handle cells that are numeric, char, or string scalars.
+            n = numel(inputV);
+            newInputV = nan(n,1);
+            for k = 1:n
+                val = inputV{k};
+                if isnumeric(val) && isscalar(val)
+                    newInputV(k) = val;
+                elseif isstring(val) || ischar(val)
+                    % try numeric conversion from text
+                    num = str2double(string(val));
+                    if ~isnan(num)
+                        newInputV(k) = num;
+                    else
+                        newInputV(k) = NaN;
+                    end
+                else
+                    % fallback: attempt to convert any other type to double
+                    try
+                        newInputV(k) = double(val);
+                    catch
+                        newInputV(k) = NaN;
+                    end
+                end
+            end
+            inputV = newInputV;
+       % if iscell(inputV)
+       %      num = size(inputV);
+       %      newInputV = ones(1,num(1));
+       %      disp(inputV)
+       %      size(inputV)
+       %      disp(num(1))
+       %      for n = 1:num(1)
+       %          disp(inputV{n})
+       %          size(inputV{1,n})
+       %          newInputV(n) = inputV{n,1};
+       %      end
+       %      inputV = newInputV;
+       %     disp(inputV)
+       % 
+       % inputV = cell2mat(inputV);
+       else  
+         summary(inputV)
+         class(inputV)
+         disp(dataLoc)
+         pause;
+     
+       end
     end
     input = table(inputT, inputV);
     outputTable = input;
@@ -79,67 +177,71 @@ totalSteps = minutes(endTime - startTime)/15;
     ndamStorage = ones(1,totalSteps);
     nRain = ones(1,totalSteps);
     nwindDirection = ones(1,totalSteps);
-riverBottom = 77.4 - 70; %[m] from sea level
-% for t= 1:totalSteps
-%     disp(["timeStamp: ", t, "/",totalSteps])
-%     dt = startTime + minutes((t-1)*15);
-%     nTime(t) = dt;
-%     disp(dt)
-% 
-%     %ndamStorage(t) = dCheck(dt,damStorage);
-%     nwindDirection(t) = dCheck(dt,windDirection);
-%     if any(isnan([nwindDirection(t)]), 'all')
-%             warning('NaN detected at t=%d', t);
-%             disp(dt)
-%             keyboard      % inspect workspace interactively
-%     end
-%     % nlowCloud(t) = dCheck(dt,skyc1);
-%     % nhighCloud(t) = max([dCheck(dt,skyc2),dCheck(dt,skyc3)]);
-% end
-% % nTime = rot90(nTime);
-% newTable = {nTime,nTair,nupStreamTemp,nDownStreamTemp,nInflow,nOutFlow,nDischarge,ndsWV,ndepthH,nWz,nRH,nlowCloud,nhighCloud};
-% writecell(newTable, 'DallesFilteredData.csv');
+  
+parfor t= 1:totalSteps
+    disp(["timeStamp: ", t, "/",totalSteps])
+    dt = startTime + minutes((t-1)*15);
+    nTime(t) = dt;
+    disp(dt) 
 
-% Prepare table with column names and data columns
-% T = table(nTime.', nTair.', nupStreamTemp.', nDownStreamTemp.', nInflow.', ...
-%     nOutFlow.', nDischarge.', ndsWV.', ndepthH.', nWz.', nRH.', nlowCloud.', nhighCloud.', ...
-%     'VariableNames', {'nTime','nTair','nupStreamTemp','nDownStreamTemp','nInflow', ...
-%     'nOutFlow','nDischarge','ndsWV','ndepthH','nWz','nRH','nlowCloud','nhighCloud'});
-% 
-% % Write table to CSV with header (first row are variable names)
-% writetable(T, );
+    ndepthH(t) = dCheck(dt,gaugeHeight);
+    nupStreamTemp(t) = dCheck(dt,upstreamTemp);
+    nDownStreamTemp(t) = dCheck(dt,downstreamTemp);
+    nTair(t) = dCheck(dt, Tair);
+    nInflow(t) = dCheck(dt, inflow);
+    nOutFlow(t) = dCheck(dt, outflow);
+    nDischarge(t) = dCheck(dt, discharge);
+    nWz(t) = dCheck(dt,wZ);
+    nRH(t) = dCheck(dt,rH);
+    ndsWV(t) = dCheck(dt,downstreamWaterVelocity);
+    ndamElevation(t) = dCheck(dt,damElevation);
+    nlowCloud(t) = dCheck(dt,skyc1);
+    nhighCloud(t) = max([dCheck(dt,skyc2),dCheck(dt,skyc3)]);
+    ndamStorage(t) = dCheck(dt,damStorage);
+    nwindDirection(t) = dCheck(dt,windDirection);
+    nRain(t) = dCheck(dt,precipitation);
+end
+newTable = {nTime,nTair,nupStreamTemp,nDownStreamTemp,nInflow,nOutFlow,nDischarge,ndsWV,ndepthH,nWz,nRH,nlowCloud,nhighCloud};
+writecell(newTable, csvFile);
 
-% Replace a column in an existing CSV (DallesFilteredData_table.csv) with a new data array.
-% Configurable inputs:
-% temp = ones(1:totalSteps);
-datainput = {
-   % temp,...    % nTime, ...
-    nTair;...
-    nWz;  ...
-    nOutFlow;...
-    nRH;...
-    ndsWV;...
-    ndepthH;...
-    nInflow;...
-    nupStreamTemp;...
-    nDownStreamTemp;...
-    nDischarge;...
-    nlowCloud;...
-    nhighCloud;...
-    ndamElevation;...
-    ndamStorage;...
-    nRain;...
-    nwindDirection...
-};
-disp(datainput(:,1));
-num = size(datainput(:,1));
-arrays = num(1);
-disp(num)
+
+
+
+
+% Assemble table with specified variable order and names, ensuring column vectors
+varNames = {'nTime','nTair','nupStreamTemp','nDownStreamTemp','nInflow', ...
+    'nOutFlow','nDischarge','ndsWV','ndepthH','nWz','nRH','nlowCloud','nhighCloud', ...
+    'ndamElevation','ndamStorage','nRain','nwindDirection'};
+
+% Ensure nTime is a column of datetimes (if currently NaT row vector)
+if isrow(nTime)
+    nTime = nTime.';
+end
+cols = {nTime, nTair(:), nupStreamTemp(:), nDownStreamTemp(:), nInflow(:), ...
+    nOutFlow(:), nDischarge(:), ndsWV(:), ndepthH(:), nWz(:), nRH(:), nlowCloud(:), nhighCloud(:), ...
+    ndamElevation(:), ndamStorage(:), nRain(:), nwindDirection(:)};
+
+% Validate lengths: all columns must have same number of rows
+nRows = numel(cols{1});
+for k = 2:numel(cols)
+    if numel(cols{k}) ~= nRows
+        error('Column %s has length %d but expected %d.', varNames{k}, numel(cols{k}), nRows);
+    end
+end
+
+% Create table using provided variable names
+Tout = table(cols{:}, 'VariableNames', varNames);
+
+% Write to CSV file with header row (variable names)
+writetable(Tout, csvFile);
+
+
+
 % for i = 1:arrays
 %      writeColumnToCSV(datainput(i,:), csvFile, i)
 %      disp("iter")
 % end
-% 
+% I need you to write the following arrays into a table "Dalles2024FilteredData_table.csv". the first row of every column has the name of the variable. 'nTime','nTair','nupStreamTemp','nDownStreamTemp','nInflow', 'nOutFlow','nDischarge','ndsWV','ndepthH','nWz','nRH','nlowCloud','nhighCloud','ndamElevation', 'ndamStorage','nRain','nwindDirection'
 
 
 
