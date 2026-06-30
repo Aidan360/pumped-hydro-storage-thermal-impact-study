@@ -6,35 +6,37 @@
 % =========================================================
 clear; clc;
 % MAX DATA RANGE 3/13/2025 19:00 - 9/24/2025 15:00
-startTime = datetime('4/5/2023 23:00', Format  = 'MM-dd-uuuu HH:mm');
-%endTime = datetime('3/13/2025 23:00', Format  = 'MM-dd-uuuu HH:mm');
-endTime = datetime('9/19/2023 19:00', Format  = 'MM-dd-uuuu HH:mm');
-csvFile = 'Dalles2023FilteredData_table.csv';
+startTime = datetime('9/3/2021 19:00', Format  = 'MM-dd-uuuu HH:mm');
+endTime = datetime('9/22/2021 16:00', Format  = 'MM-dd-uuuu HH:mm');
+csvFile = 'Dalles2021FilteredData_table.csv';
 % copy and paste all data points for ai usage:
 %upstreamTemp inflow outflow discharge downstreamWaterVelocity wZ rH
 %lowCloud highCloud gaugeHeight damElevation damStorage precipitation windDirection
-datFile = 'Dalles2023.xlsx';
+datFile = 'Dalles2021.xlsx';
 % 2025 data range 3/13/2025 19:00 - 9/24/2025 15:00
-% 2024 data range 3/27/24 16:00 -  9/24/24 19:00
-% 2023 data range 4/5/23 23:00 - 9/19/23 19:00
-
-upstreamTemp = tableProcess(readtable(datFile,'Sheet',5),2,3); %5
-downstreamTemp = tableProcess(readtable(datFile,'Sheet',4),2,3); %4
-inflow = tableProcess(readtable(datFile,'Sheet',8),2,4); %8
-outflow = tableProcess(readtable(datFile,'Sheet',2),2,4); %2
-discharge = tableProcess(readtable(datFile,'Sheet',9),2,4); %9
+% 2024 data range 3/27/2024 16:00 -  9/24/2024 19:00
+% 2023 data range 4/5/2023 23:00 - 9/19/2023 19:00
+% 2022 data range 3/30/2022 17:00 - 9/13/2022 21:00
+% 2021 data range 9/3/2021 19:00 - 9/22/2021 16:00
+gaugeHeight = tableProcess(readtable(datFile,'Sheet',1),1,3); % 1  
+outflow = tableProcess(readtable(datFile,'Sheet',2),1,3); %2
+downstreamWaterVelocity = tableProcess(readtable(datFile,'Sheet',3),1,3);  %3
+downstreamTemp = tableProcess(readtable(datFile,'Sheet',4),1,2); %4
+upstreamTemp = tableProcess(readtable(datFile,'Sheet',5),1,2); %5
+damStorage = tableProcess(readtable(datFile,'Sheet',6),1,3);%6
+damElevation = tableProcess(readtable(datFile,'Sheet',7),1,3);  %7
+inflow = tableProcess(readtable(datFile,'Sheet',8),1,3); %8
+discharge = tableProcess(readtable(datFile,'Sheet',9),1,3); %9
 Tair = tableProcess(readtable(datFile,'Sheet',10),1,2); %10
 rH = tableProcess(readtable(datFile,'Sheet',11),1,2); %11
-wZ = tableProcess(readtable(datFile,'Sheet',13),1,3); %13
-skyc1 = tableProcess(readtable(datFile,'Sheet',15),1,4); %15
-skyc2 = tableProcess(readtable(datFile,'Sheet',15),1,5); %15
-skyc3 = tableProcess(readtable(datFile,'Sheet',15),1,6); %15
-downstreamWaterVelocity = tableProcess(readtable(datFile,'Sheet',3),2,4);  %3
-gaugeHeight = tableProcess(readtable(datFile,'Sheet',1),2,4); % 1  
-damElevation = tableProcess(readtable(datFile,'Sheet',7),2,4);  %7
-damStorage = tableProcess(readtable(datFile,'Sheet',6),2,4);%6
-precipitation = tableProcess(readtable(datFile,'Sheet',14),1,2); % 14
 windDirection = tableProcess(readtable(datFile,'Sheet',12),1,2); % 12
+wZ = tableProcess(readtable(datFile,'Sheet',13),1,3); %13
+precipitation = tableProcess(readtable(datFile,'Sheet',14),1,2); % 14
+skyc1 = tableProcess(readtable(datFile,'Sheet',15),1,5); %15
+skyc2 = tableProcess(readtable(datFile,'Sheet',15),1,6); %15
+skyc3 = tableProcess(readtable(datFile,'Sheet',15),1,7); %15
+
+
 
 
 

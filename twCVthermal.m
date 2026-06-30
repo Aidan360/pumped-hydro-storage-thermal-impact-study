@@ -12,15 +12,23 @@ clear; clc;
 % MAX DATA RANGE
 % 2025: 3/13/2025 19:00 - 9/24/2025 15:00
 
-csvDat = 'Dalles2025FilteredData_table.csv';
-startTime = datetime('3/13/2025 19:00', Format  = 'MM-dd-uuuu HH:mm');
-endTime = datetime('9/24/2025 15:00', Format  = 'MM-dd-uuuu HH:mm');
+csvDat = 'Dalles2021FilteredData_table.csv';
+% startTime = datetime('3/13/2025 19:00', Format  = 'MM-dd-uuuu HH:mm');
+% endTime = datetime('9/24/2025 15:00', Format  = 'MM-dd-uuuu HH:mm');
 %csvDat = 'Dalles2025FilteredData_table.csv'
 % 2024: 3/27/24 16:00 -  9/24/24 19:00
 % csvDat = 'Dalles2024FilteredData_table.csv';
 % startTime = datetime('3/27/2024 16:00', Format  = 'MM-dd-uuuu HH:mm');
 % endTime = datetime('9/24/2024 19:00', Format  = 'MM-dd-uuuu HH:mm');
-
+% 2023 data range 4/5/23 23:00 - 9/19/23 19:00
+%startTime = datetime('4/5/2023 23:00', Format  = 'MM-dd-uuuu HH:mm');
+%endTime = datetime('9/19/2023 19:00', Format  = 'MM-dd-uuuu HH:mm');
+% 2022 data range 3/30/2022 17:00 - 9/13/2022 21:00
+% startTime = datetime('3/30/2022 17:00', Format  = 'MM-dd-uuuu HH:mm');
+% endTime = datetime('9/13/2022 21:00', Format  = 'MM-dd-uuuu HH:mm');
+% 2021 data range 9/3/2021 19:00 - 9/22/2021 16:00
+startTime = datetime('9/3/2021 19:00', Format  = 'MM-dd-uuuu HH:mm');
+endTime = datetime('9/22/2021 16:00', Format  = 'MM-dd-uuuu HH:mm');
 %% DAM PARAMETERS
 spillwayCrest = 121; %{Ft]
 maxStorage = 554900; %[Acre*ft] by top of flood control

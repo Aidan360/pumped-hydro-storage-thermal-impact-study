@@ -12,7 +12,7 @@
 % not then it uses shortwave penetration
 % wind speed units are m/s
 
-%mon, 8 - 
+%mon, 8 - 12
 
 
 %%
