@@ -5,9 +5,15 @@
 %
 % =========================================================
 clear; clc;
+datRecord = true;
 % MAX DATA RANGE 3/13/2025 19:00 - 9/24/2025 15:00
-startTime = datetime('9/3/2021 19:00', Format  = 'MM-dd-uuuu HH:mm');
+startTime = datetime('5/19/2021 18:00', Format  = 'MM-dd-uuuu HH:mm');
 endTime = datetime('9/22/2021 16:00', Format  = 'MM-dd-uuuu HH:mm');
+% dataFiles = blanks(1,2025);
+% dataFiles(2021) = 'Dalles2021.xlsx';
+% dataFiles(2022) = 'Dalles2022.xlsx';
+% dataFiles(2023) 
+
 csvFile = 'Dalles2021FilteredData_table.csv';
 % copy and paste all data points for ai usage:
 %upstreamTemp inflow outflow discharge downstreamWaterVelocity wZ rH
@@ -17,10 +23,10 @@ datFile = 'Dalles2021.xlsx';
 % 2024 data range 3/27/2024 16:00 -  9/24/2024 19:00
 % 2023 data range 4/5/2023 23:00 - 9/19/2023 19:00
 % 2022 data range 3/30/2022 17:00 - 9/13/2022 21:00
-% 2021 data range 9/3/2021 19:00 - 9/22/2021 16:00
+% 2021 data range 5/19/2021 19:00 - 9/22/2021 16:00
 gaugeHeight = tableProcess(readtable(datFile,'Sheet',1),1,3); % 1  
 outflow = tableProcess(readtable(datFile,'Sheet',2),1,3); %2
-downstreamWaterVelocity = tableProcess(readtable(datFile,'Sheet',3),1,3);  %3
+%downstreamWaterVelocity = tableProcess(readtable(datFile,'Sheet',3),1,3);  %3
 downstreamTemp = tableProcess(readtable(datFile,'Sheet',4),1,2); %4
 upstreamTemp = tableProcess(readtable(datFile,'Sheet',5),1,2); %5
 damStorage = tableProcess(readtable(datFile,'Sheet',6),1,3);%6
@@ -36,11 +42,67 @@ skyc1 = tableProcess(readtable(datFile,'Sheet',15),1,5); %15
 skyc2 = tableProcess(readtable(datFile,'Sheet',15),1,6); %15
 skyc3 = tableProcess(readtable(datFile,'Sheet',15),1,7); %15
 
-
-
-
-
-disp("data loaded!")
+% 
+% 
+% 
+% if ~exist('downstreamWaterVelocity','var')
+%     disp('replacing downstream with function')
+%     downStreamCalc = true;
+% else
+%     downStreamCalc = false;
+% end
+% 
+% % align downstream and upstream by time, interpolate upstream to downstream times
+% % assume downstreamTemp and upstreamTemp are tables with datetime in first col and values in second
+% t_down = downstreamTemp{:,1};
+% v_down = downstreamTemp{:,2};
+% t_up = upstreamTemp{:,1};
+% v_up = upstreamTemp{:,2};
+% 
+% % restrict to overlapping time range
+% t0 = max(min(t_down), min(t_up));
+% t1 = min(max(t_down), max(t_up));
+% mask_down = t_down >= t0 & t_down <= t1;
+% mask_up = t_up >= t0 & t_up <= t1;
+% t_down = t_down(mask_down); v_down = v_down(mask_down);
+% t_up = t_up(mask_up); v_up = v_up(mask_up);
+% 
+% % interpolate upstream onto downstream times (use linear)
+% v_up_on_down = interp1(datenum(t_up), v_up, datenum(t_down), 'linear', NaN);
+% 
+% % remove NaNs
+% valid = ~isnan(v_up_on_down) & ~isnan(v_down);
+% t = t_down(valid);
+% y = v_down(valid);
+% x = v_up_on_down(valid);
+% 
+% % fit linear model y = m*x + b
+% p = polyfit(x,y,1);
+% m = p(1);
+% b = p(2);
+% 
+% % compute average slope approx (use mean of local slopes as check)
+% local_slopes = diff(y)./diff(x);
+% avg_local_slope = mean(local_slopes(~isnan(local_slopes) & isfinite(local_slopes)));
+% 
+% % plot
+% figure;
+% plot(x,y,'.');
+% hold on;
+% xx = linspace(min(x),max(x),100);
+% plot(xx, polyval(p,xx), '-r','LineWidth',1.5);
+% xlabel('Upstream Temp');
+% ylabel('Downstream Temp');
+% title(sprintf('Downstream vs Upstream Temp: slope=%.4f, offset=%.4f', m, b));
+% legend('Data','Linear fit','Location','best');
+% grid on;
+% hold off;
+% 
+% % display results
+% fprintf('Linear fit: downstream = %.6f * upstream + %.6f\n', m, b);
+% fprintf('Average local slope: %.6f\n', avg_local_slope);
+% 
+% disp("data loaded!")
 
 
 
@@ -160,7 +222,9 @@ function out = dCheck(in,arr) %faster terminology for interpolation
     out = interp1(x_unique, y_unique, in,'linear');
  % out = interp1(arr{:,1},arr{:,2},in,'linear');
 end
-totalSteps = minutes(endTime - startTime)/15;
+if datRecord == true
+
+    totalSteps = minutes(endTime - startTime)/15;
 
     nTime    =       NaT(1,totalSteps); 
     nTair =          ones(1,totalSteps);
@@ -180,6 +244,10 @@ totalSteps = minutes(endTime - startTime)/15;
     nRain = ones(1,totalSteps);
     nwindDirection = ones(1,totalSteps);
   
+
+
+
+
 parfor t= 1:totalSteps
     disp(["timeStamp: ", t, "/",totalSteps])
     dt = startTime + minutes((t-1)*15);
@@ -195,13 +263,17 @@ parfor t= 1:totalSteps
     nDischarge(t) = dCheck(dt, discharge);
     nWz(t) = dCheck(dt,wZ);
     nRH(t) = dCheck(dt,rH);
-    ndsWV(t) = dCheck(dt,downstreamWaterVelocity);
     ndamElevation(t) = dCheck(dt,damElevation);
     nlowCloud(t) = dCheck(dt,skyc1);
     nhighCloud(t) = max([dCheck(dt,skyc2),dCheck(dt,skyc3)]);
     ndamStorage(t) = dCheck(dt,damStorage);
     nwindDirection(t) = dCheck(dt,windDirection);
     nRain(t) = dCheck(dt,precipitation);
+    if downStreamCalc == false
+        ndsWV(t) = dCheck(dt,downstreamWaterVelocity);
+    else
+        ndsWV(t) = 0.000104602*nDischarge(t)+0.01683; 
+    end
 end
 newTable = {nTime,nTair,nupStreamTemp,nDownStreamTemp,nInflow,nOutFlow,nDischarge,ndsWV,ndepthH,nWz,nRH,nlowCloud,nhighCloud};
 writecell(newTable, csvFile);
@@ -236,7 +308,7 @@ Tout = table(cols{:}, 'VariableNames', varNames);
 
 % Write to CSV file with header row (variable names)
 writetable(Tout, csvFile);
-
+end % end of dat record stuff
 
 
 % for i = 1:arrays
