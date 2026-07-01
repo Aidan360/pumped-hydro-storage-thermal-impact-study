@@ -45,12 +45,12 @@ skyc3 = tableProcess(readtable(datFile,'Sheet',15),1,7); %15
 % 
 % 
 % 
-% if ~exist('downstreamWaterVelocity','var')
-%     disp('replacing downstream with function')
-%     downStreamCalc = true;
-% else
-%     downStreamCalc = false;
-% end
+if ~exist('downstreamWaterVelocity','var')
+    disp('replacing downstream with function')
+    downStreamCalc = true;
+else
+    downStreamCalc = false;
+end
 % 
 % % align downstream and upstream by time, interpolate upstream to downstream times
 % % assume downstreamTemp and upstreamTemp are tables with datetime in first col and values in second
