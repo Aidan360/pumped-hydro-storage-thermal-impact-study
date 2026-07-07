@@ -12,7 +12,7 @@ clear; clc;
 % MAX DATA RANGE
 % 2025: 3/13/2025 19:00 - 9/24/2025 15:00
 
-csvDat = 'Dalles2021FilteredData_table.csv';
+% csvDat = 'Dalles2025FilteredData_table.csv';
 % startTime = datetime('3/13/2025 19:00', Format  = 'MM-dd-uuuu HH:mm');
 % endTime = datetime('9/24/2025 15:00', Format  = 'MM-dd-uuuu HH:mm');
 %csvDat = 'Dalles2025FilteredData_table.csv'
@@ -21,14 +21,21 @@ csvDat = 'Dalles2021FilteredData_table.csv';
 % startTime = datetime('3/27/2024 16:00', Format  = 'MM-dd-uuuu HH:mm');
 % endTime = datetime('9/24/2024 19:00', Format  = 'MM-dd-uuuu HH:mm');
 % 2023 data range 4/5/23 23:00 - 9/19/23 19:00
-%startTime = datetime('4/5/2023 23:00', Format  = 'MM-dd-uuuu HH:mm');
-%endTime = datetime('9/19/2023 19:00', Format  = 'MM-dd-uuuu HH:mm');
+% csvDat = 'Dalles2023FilteredData_table.csv';
+% startTime = datetime('4/5/2023 23:00', Format  = 'MM-dd-uuuu HH:mm');
+% endTime = datetime('9/19/2023 19:00', Format  = 'MM-dd-uuuu HH:mm');
 % 2022 data range 3/30/2022 17:00 - 9/13/2022 21:00
+% csvDat = 'Dalles2022FilteredData_table.csv';
 % startTime = datetime('3/30/2022 17:00', Format  = 'MM-dd-uuuu HH:mm');
 % endTime = datetime('9/13/2022 21:00', Format  = 'MM-dd-uuuu HH:mm');
 % 2021 data range 9/3/2021 19:00 - 9/22/2021 16:00
-startTime = datetime('9/3/2021 19:00', Format  = 'MM-dd-uuuu HH:mm');
-endTime = datetime('9/22/2021 16:00', Format  = 'MM-dd-uuuu HH:mm');
+
+
+
+
+csvDat = 'Dalles2016-2025FilteredData_table.csv';
+startTime = datetime('1/1/2020 0:00', Format  = 'MM-dd-uuuu HH:mm');
+endTime = datetime(' 12/30/2025 23:45', Format  = 'MM-dd-uuuu HH:mm');
 %% DAM PARAMETERS
 spillwayCrest = 121; %{Ft]
 maxStorage = 554900; %[Acre*ft] by top of flood control
@@ -49,7 +56,6 @@ riverDir = 319.59; %[riverDirection]
 
 
 Tf = readtable(csvDat); % filtered data
-any(isnan(Tf{:,2}), 'all')
 timeVar = Tf{:,1};
 Tair =  Tf{:,2}; %[m^3/s]
 upstreamTemp = Tf{:,3};%[C]
@@ -67,142 +73,10 @@ damElevation =  Tf{:,14}; %[ft]
 damStorage = Tf{:,15}; %[acre*ft]
 rain = Tf{:,16}; %{mm]
 windDirection = Tf{:,17}; % [angle from true north]
+spillWay = Tf{:,18};
 summary(damElevation)
 
 disp("all data has loaded")
-
-
-
-
-% 
-% % -------------------------
-% % PLOTS: pairwise plotting of listed variables against time and against each other
-% % -------------------------
-% vars = { ...
-%     'upstreamTemp', upstreamTemp; ...
-%     'downstreamTemp', downstreamTemp; ...
-%     'inflow', inflow; ...
-%     'outflow', outflow; ...
-%     'discharge', discharge; ...
-%     'downstreamWaterVelocity', downstreamWaterVelocity; ...
-%     'wZ', wZ; ...
-%     'rH', rH; ...
-%     'lowCloud', lowCloud; ...
-%     'highCloud', highCloud; ...
-%     'gaugeHeight', gaugeHeight; ...
-%     'damElevation', damElevation; ...
-%     'damStorage', damStorage; ...
-%     'rain', rain; ...
-%     'windDirection', windDirection ...
-%     };
-% 
-% nVars = size(vars,1);
-% 
-% % 1) Plot each variable vs time in individual subplots (grouped pages if needed)
-% ptsPerPage = 6; % number of subplots per figure
-% nPages = ceil(nVars/ptsPerPage);
-% for p = 1:nPages
-%     hf = figure('Name',sprintf('Time series page %d',p),'NumberTitle','off');
-%     startIdx = (p-1)*ptsPerPage + 1;
-%     endIdx = min(p*ptsPerPage, nVars);
-%     for k = startIdx:endIdx
-%         axIdx = k - startIdx + 1;
-%         subplot(ptsPerPage,1,axIdx);
-%         plot(timeVar, vars{k,2}, '-b');
-%         grid on;
-%         ylabel(vars{k,1}, 'Interpreter','none');
-%         if axIdx == 1
-%             title(sprintf('Time series (page %d)', p));
-%         end
-%         if axIdx == ptsPerPage || k==endIdx
-%             xlabel('Time');
-%         else
-%             set(gca,'XTickLabel',[]);
-%         end
-%     end
-% end
-% 
-% % 2) Scatter matrix (pairwise) for quick visual correlation among numeric arrays
-% % Assemble numeric matrix: convert all to column vectors and ensure same length
-% N = numel(timeVar);
-% dataMat = nan(N, nVars);
-% for k = 1:nVars
-%     v = vars{k,2};
-%     if isrow(v), v = v(:); end
-%     if numel(v) ~= N
-%         % try to expand or truncate to match N
-%         minN = min(numel(v), N);
-%         temp = nan(N,1);
-%         temp(1:minN) = v(1:minN);
-%         v = temp;
-%     end
-%     dataMat(:,k) = v;
-% end
-% 
-% % Use built-in scattermatrix if available; otherwise create custom pairwise scatter plots
-% if exist('plotmatrix','file')
-%     hf2 = figure('Name','Pairwise scatter matrix','NumberTitle','off');
-%     [H, ax] = plotmatrix(dataMat);
-%     % label axes
-%     n = nVars;
-%     for i = 1:n
-%         xlabel(ax(n,i), vars{i,1}, 'Interpreter','none');
-%         ylabel(ax(i,1), vars{i,1}, 'Interpreter','none');
-%     end
-% else
-%     % simple pairwise scatter loops, create multiple figures to avoid huge figure
-%     maxPerFig = 9; % plots per figure (3x3)
-%     pairs = nchoosek(1:nVars,2);
-%     nPairs = size(pairs,1);
-%     figs = ceil(nPairs / maxPerFig);
-%     pIdx = 1;
-%     for f = 1:figs
-%         hf = figure('Name',sprintf('Pairwise scatters %d',f),'NumberTitle','off');
-%         for s = 1:min(maxPerFig, nPairs-(f-1)*maxPerFig)
-%             subplot(3,3,s);
-%             i = pairs(pIdx,1);
-%             j = pairs(pIdx,2);
-%             scatter(dataMat(:,i), dataMat(:,j), 6, '.');
-%             xlabel(vars{i,1}, 'Interpreter','none');
-%             ylabel(vars{j,1}, 'Interpreter','none');
-%             grid on;
-%             pIdx = pIdx + 1;
-%         end
-%     end
-% end
-% 
-% % 3) Correlation matrix (Pearson) and heatmap for numeric insight
-% R = corrcoef(dataMat, 'Rows','pairwise');
-% hf3 = figure('Name','Correlation matrix','NumberTitle','off');
-% imagesc(R);
-% colorbar;
-% axis tight;
-% xticks(1:nVars); yticks(1:nVars);
-% xticklabels(vars(:,1)); yticklabels(vars(:,1));
-% xtickangle(45);
-% title('Pearson correlation matrix (pairwise)');
-% % annotate values
-% for i = 1:nVars
-%     for j = 1:nVars
-%         text(j,i,sprintf('%.2f',R(i,j)), 'HorizontalAlignment','center', 'Color','w','FontSize',8);
-%     end
-% end
-% 
-% % 4) Save figures to a folder 'plots' for later inspection
-% outDir = fullfile(pwd,'plots');
-% if ~exist(outDir,'dir'), mkdir(outDir); end
-% figs = findobj('Type','figure');
-% for i = 1:numel(figs)
-%     try
-%         fname = fullfile(outDir, sprintf('figure_%02d.png', i));
-%         saveas(figs(i), fname);
-%     catch
-%         % ignore save errors
-%     end
-% end
-% 
-% disp('Plotting complete. Figures saved in ./plots (if writable).');
-
 
 
 
@@ -262,6 +136,146 @@ pumpPowerCoff = (pumpEff) * waterDensity * g * head; % [J/m^3]
 %%-----------------
 % 2. Data Processing
 %%----------------
+% % % 
+% % % datFile = 'Dalles2016-2025.xlsx';
+% % % downstreamTempRaw = tableProcess(readtable(datFile,'Sheet',4),1,2); %4
+% % % upstreamTempRaw = tableProcess(readtable(datFile,'Sheet',5),1,2); %5
+% % % 
+% % % function outputTable = tableProcess(inputArray,timeLoc,dataLoc) % all arrays are processed Tvar Dvar
+% % %     inputT = inputArray{:,timeLoc};
+% % %     inputT = datetime(inputT, Format  = 'MM-dd-yy HH:mm');
+% % %     inputV = inputArray{:,dataLoc};
+% % % 
+% % %     % Remove rows where either time or value is missing/empty
+% % %     % Handle empty strings in cell/char/string arrays for inputV and NaT for inputT
+% % %     % Create logical mask of valid time entries
+% % %     if isdatetime(inputT)
+% % %         validT = ~isnat(inputT);
+% % %     else
+% % %         validT = ~ismissing(inputT);
+% % %     end
+% % % 
+% % %     % Create logical mask of valid value entries
+% % %     if isnumeric(inputV)
+% % %         validV = ~isnan(inputV);
+% % %     elseif iscell(inputV)
+% % %         % cell may contain empty '', <missing>, or NaN
+% % %         validV = true(size(inputV));
+% % %         for ii = 1:numel(inputV)
+% % %             v = inputV{ii};
+% % %             if isempty(v) || (ischar(v) && all(isspace(v))) || (isstring(v) && strlength(v) == 0)
+% % %                 validV(ii) = false;
+% % %             elseif (isnumeric(v) && isnan(v)) || isequal(v,missing)
+% % %                 validV(ii) = false;
+% % %             end
+% % %         end
+% % %     elseif isstring(inputV) || ischar(inputV)
+% % %         validV = ~ismissing(inputV) & strlength(string(inputV))>0;
+% % %     else
+% % %         % fallback: use ismissing
+% % %         validV = ~ismissing(inputV);
+% % %     end
+% % % 
+% % %     % Combine masks and apply to both arrays
+% % %     valid = validT & validV;
+% % %     inputT = inputT(valid);
+% % %     inputV = inputV(valid);
+% % %     %disp(inputT)
+% % %     disp(class(inputT))
+% % %     disp(size(inputT))
+% % %     if (inputT(end) - inputT(1)) < 0 % checks if its orded last to first 
+% % %         inputT = rot90(inputT,2);
+% % %         inputV = rot90(inputV,2);
+% % %     end
+% % %     if isnumeric(inputV) ~= true
+% % % 
+% % %         if iscell(inputV)
+% % %             % Convert cell column that contains scalar numeric entries (possibly as strings)
+% % %             % into a numeric column vector.
+% % %             % Handle cells that are numeric, char, or string scalars.
+% % %             n = numel(inputV);
+% % %             newInputV = nan(n,1);
+% % %             for k = 1:n
+% % %                 val = inputV{k};
+% % %                 if isnumeric(val) && isscalar(val)
+% % %                     newInputV(k) = val;
+% % %                 elseif isstring(val) || ischar(val)
+% % %                     % try numeric conversion from text
+% % %                     num = str2double(string(val));
+% % %                     if ~isnan(num)
+% % %                         newInputV(k) = num;
+% % %                     else
+% % %                         newInputV(k) = NaN;
+% % %                     end
+% % %                 else
+% % %                     % fallback: attempt to convert any other type to double
+% % %                     try
+% % %                         newInputV(k) = double(val);
+% % %                     catch
+% % %                         newInputV(k) = NaN;
+% % %                     end
+% % %                 end
+% % %             end
+% % %             inputV = newInputV;
+% % %        % if iscell(inputV)
+% % %        %      num = size(inputV);
+% % %        %      newInputV = ones(1,num(1));
+% % %        %      disp(inputV)
+% % %        %      size(inputV)
+% % %        %      disp(num(1))
+% % %        %      for n = 1:num(1)
+% % %        %          disp(inputV{n})
+% % %        %          size(inputV{1,n})
+% % %        %          newInputV(n) = inputV{n,1};
+% % %        %      end
+% % %        %      inputV = newInputV;
+% % %        %     disp(inputV)
+% % %        % 
+% % %        % inputV = cell2mat(inputV);
+% % %        else  
+% % % 
+% % %        end
+% % %     end
+% % %     input = table(inputT,inputV);
+% % %     outputTable = input;
+% % % end
+% % % % Extract upstreamTempRaw and downstreamTempRaw from Tf if they exist as tables
+% % % % expecting variables named upstreamTempRaw and downstreamTempRaw in workspace or Tf
+% % % % Each should be Nx2 with datetime in column 1 and data in column 2.
+% % % 
+% % % % Ensure upstreamTempRaw and downstreamTempRaw exist
+% % % if exist('upstreamTempRaw','var') ~= 1 || exist('downstreamTempRaw','var') ~= 1
+% % %     error('upstreamTempRaw and downstreamTempRaw must exist in workspace.');
+% % % end
+% % % 
+% % % % Helper to validate and extract datetime and value columns from a table-like input
+% % % extractAndFilter = @(T, startTime, endTime) deal( ...
+% % %     T{ T{:,1}>=startTime & T{:,1}<=endTime , 1}, ...
+% % %     T{ T{:,1}>=startTime & T{:,1}<=endTime , 2} );
+% % % 
+% % % % If inputs are timetable, convert to table
+% % % if istimetable(upstreamTempRaw)
+% % %     upstreamTempRaw = timetable2table(upstreamTempRaw,'ConvertRowTimes',true);
+% % %     upstreamTempRaw.Properties.VariableNames{1} = 'Var1';
+% % % end
+% % % if istimetable(downstreamTempRaw)
+% % %     downstreamTempRaw = timetable2table(downstreamTempRaw,'ConvertRowTimes',true);
+% % %     downstreamTempRaw.Properties.VariableNames{1} = 'Var1';
+% % % end
+% % % 
+% % % % Filter by startTime and endTime
+% % % uTimes = upstreamTempRaw{:,1};
+% % % dTimes = downstreamTempRaw{:,1};
+% % % 
+% % % uMask = uTimes >= startTime & uTimes <= endTime;
+% % % dMask = dTimes >= startTime & dTimes <= endTime;
+% % % 
+% % % upstreamTempN = upstreamTempRaw(uMask, :);
+% % % downstreamTempN = downstreamTempRaw(dMask, :);
+% % % 
+% % % % Ensure outputs are Nx2 tables with datetime in column1 and data in column2
+% % % upstreamTempRaw = upstreamTempN(:,1:2);
+% % % downstreamTempRaw = downstreamTempN(:,1:2);
 
 surfdat = ones(1,totalSteps);
 pumpdat = ones(1,totalSteps);
@@ -283,7 +297,7 @@ for t = 1:totalSteps
     
     disp(["timeStamp: ", t])
     dt = startTime + minutes((t-1)*15);
- %   disp(dt)
+    disp(dt)
     aP = find(timeVar == dt);
     if isempty(aP)
       error('No matching timestamp for %s', char(dt));
@@ -313,12 +327,13 @@ for t = 1:totalSteps
             outflow(aP),... % 3
             cloudiness,... % 4
             rH(aP), ...% 5
-            downstreamWaterVelocity(aP), ... % 6
+            0.000104602*discharge(aP)+0.01683,... %downstreamWaterVelocity(aP), ... % 6
             gaugeHeight(aP), ... % 7
             inflow(aP), ... % 8
             upstreamTemp(aP),... % 9
             rain(aP), ... % 10
-            windDirection(aP)... % 11  
+            windDirection(aP),... % 11  
+            spillWay(aP),...
             ];
     transientData = [
             resD(t), ... %1 
@@ -362,10 +377,16 @@ for t = 1:totalSteps
             updat(t) = dT(10);
             downdat(t) = dT(11);
         end
-        if any(isnan([resT(t), resV(t), resD(t), riverT(t), upstreamTemp(aP)]), 'all')
+        if (any(isnan([resT(t), resV(t), resD(t), riverT(t), upstreamTemp(aP)]), 'all') || any(isinf([resT(t), resV(t), resD(t), riverT(t), upstreamTemp(aP)]), 'all'))
             warning('NaN detected at t=%d', t);
             disp(dt)
             keyboard      % inspect workspace interactively
+        end
+        if resT(t) >= 100 || riverT(t) >= 100
+            disp('water is boiling')
+            break
+        
+
         end
 
 
@@ -417,14 +438,14 @@ heat exchange in resivour
 function out = flowCondition(rMR,resMaxDepth,riverBottom,Cp,waterDensity,turbHeatCoff,pumpHeatCoff, ...
     tD,flowRate, ...
     t,dt,rivDirection)
-
+    
 
     %transient data
     depth = tD(1);
     lT = tD(2);
     uT = tD(3);
     resV = tD(4);
-
+    disp(resV);
     %table data 
     Tair = t(1);
     Wz = t(2);
@@ -437,7 +458,7 @@ function out = flowCondition(rMR,resMaxDepth,riverBottom,Cp,waterDensity,turbHea
     upperTemp = t(10);
     rain = t(11);
     windDirection = t(12);
-  
+    spillWay = t(13);
     %Area Calculations
 
     newDepth = resDepthCalc(flowRate*15*60 + resInflow*15*60,depth,rMR,resMaxDepth);
@@ -461,20 +482,20 @@ function out = flowCondition(rMR,resMaxDepth,riverBottom,Cp,waterDensity,turbHea
     duTTurb = 0;
    if flowRate >= 0 % case one, flowing up to the upper resivour
         % heat transfer model, river ----> pump -----> resivour
-        Qpump = pumpHeatCoff*flowRate*15*60; %[W], 
+        Qpump = pumpHeatCoff*(flowRate)*15*60; %[W], 
         Qriv = (lT-uT)*Cp*flowRate*waterDensity*15*60; %[W] considering 15 min intervals
         duTdiff = Qriv/(riverDischarge*15*60 * waterDensity *Cp);
         duTPump = Qpump/(newResV * waterDensity *Cp);
         duT = duTSurface + duTPump+duTInflow+ duTdiff;
         dlT = dlTSurface;
     else
-        Qturb = turbHeatCoff*-flowRate*15*60;
+        Qturb = turbHeatCoff*-1*(flowRate+spillWay)*15*60;
         Qres = (uT-lT)*Cp*flowRate*waterDensity*15*60;
         duTTurb = Qturb/(riverDischarge*15*60 * waterDensity *Cp);
         duTdiff = Qres/(riverDischarge*15*60 * waterDensity *Cp);
         duT = duTSurface + duTInflow;
         dlT = dlTSurface + duTTurb+duTdiff;
-        if any(isnan([duT, duTSurface, duTInflow, dlTSurface, duTTurb,duTdiff]), 'all')
+        if any(isnan([duT, duTSurface, duTInflow, dlTSurface, duTTurb,duTdiff]), 'all') || any(isinf([duT, duTSurface, duTInflow, dlTSurface, duTTurb,duTdiff]), 'all')
             warning('NaN detected at exhange functions');
             keyboard
         end
@@ -482,7 +503,7 @@ function out = flowCondition(rMR,resMaxDepth,riverBottom,Cp,waterDensity,turbHea
     reT = lT + duT; % new res temp
     riT = uT + dlT; % new river temp
     out = [reT,riT,newResV,newDepth,duTSurface,duTInflow,duTTurb,duTPump,duTdiff,duT,dlT];
-
+  
 
 end
 
@@ -511,7 +532,8 @@ function out = surfaceHeatTransfer(cloudiness,Tair,Ts,Wz,Cp,surfaceArea,volume,r
 
     Q = (heatExchange)*surfaceArea*60*15;
     if volume <= 0
-      error('volume <= 0 in surfaceHeatTransfer');
+        volume = 1;
+        %error('volume <= 0 in surfaceHeatTransfer');
     end
     out = (Q+rainExchange)/(volume * waterDensity *Cp);
 end
@@ -603,107 +625,7 @@ end
 % Display results in console
 fprintf('R^2 (upper: monitor vs resT) = %.4f\n', R2_upper);
 fprintf('R^2 (lower: monitor vs riverT) = %.4f\n', R2_lower);
-% 
-% 
-% % Detailed statistical analysis between monitored and modeled temperatures
-% % for upper (monitorUpperTemp vs resT) and lower (monitorLowerTemp vs riverT)
-% 
-% % Prepare vectors (column vectors) and align to totalSteps
-% u_obs_full = monitorUpperTemp(:);
-% u_pred_full = resT(:);
-% l_obs_full = monitorLowerTemp(:);
-% l_pred_full = riverT(:);
-% 
-% n = totalSteps;
-% u_obs_full = u_obs_full(1:min(end,n));
-% u_pred_full = u_pred_full(1:min(end,n));
-% l_obs_full = l_obs_full(1:min(end,n));
-% l_pred_full = l_pred_full(1:min(end,n));
-% 
-% % Remove NaN pairs
-% validU = ~isnan(u_obs_full) & ~isnan(u_pred_full);
-% validL = ~isnan(l_obs_full) & ~isnan(l_pred_full);
-% 
-% % Helper to compute stats
-% computeStats = @(obs,pred) struct( ...
-%     'N', sum(~isnan(obs) & ~isnan(pred)), ...
-%     'mean_obs', mean(obs,'omitnan'), ...
-%     'mean_pred', mean(pred,'omitnan'), ...
-%     'bias', mean(pred-obs,'omitnan'), ...              % mean error
-%     'MAE', mean(abs(pred-obs),'omitnan'), ...          % mean absolute error
-%     'RMSE', sqrt(mean((pred-obs).^2,'omitnan')), ...  % root mean squared error
-%     'R2', 1 - sum((obs-pred).^2,'omitnan')/sum((obs-mean(obs,'omitnan')).^2,'omitnan'), ...
-%     'pearson_r', corr(obs,pred,'rows','complete'), ...
-%     'spearman_rho', corr(obs,pred,'Type','Spearman','Rows','complete') ...
-%     );
-% 
-% if any(validU)
-%     statsU = computeStats(u_obs_full(validU), u_pred_full(validU));
-% else
-%     statsU = [];
-% end
-% 
-% if any(validL)
-%     statsL = computeStats(l_obs_full(validL), l_pred_full(validL));
-% else
-%     statsL = [];
-% end
-% 
-% % Additional diagnostics: linear regression fit and Bland-Altman
-% regressionFit = @(obs,pred) struct( ...
-%     'coeff', polyfit(obs,pred,1), ... % fit pred = a*obs + b
-%     'residuals', pred - polyval(polyfit(obs,pred,1),obs) ...
-%     );
-% 
-% blandAltman = @(obs,pred) struct( ...
-%     'mean_diff', mean(pred-obs,'omitnan'), ...
-%     'sd_diff', std(pred-obs,'omitnan'), ...
-%     'upper_LOA', mean(pred-obs,'omitnan') + 1.96*std(pred-obs,'omitnan'), ...
-%     'lower_LOA', mean(pred-obs,'omitnan') - 1.96*std(pred-obs,'omitnan') ...
-%     );
-% 
-% if any(validU)
-%     regU = regressionFit(u_obs_full(validU), u_pred_full(validU));
-%     baU = blandAltman(u_obs_full(validU), u_pred_full(validU));
-% else
-%     regU = [];
-%     baU = [];
-% end
-% 
-% if any(validL)
-%     regL = regressionFit(l_obs_full(validL), l_pred_full(validL));
-%     baL = blandAltman(l_obs_full(validL), l_pred_full(validL));
-% else
-%     regL = [];
-%     baL = [];
-% end
-% 
-% % Display results to console
-% fprintf('\nDetailed statistical analysis: Upper (monitorUpperTemp vs resT)\n');
-% if ~isempty(statsU)
-%     fprintf('N = %d\n', statsU.N);
-%     fprintf('Mean observed = %.3f, Mean predicted = %.3f\n', statsU.mean_obs, statsU.mean_pred);
-%     fprintf('Bias (pred - obs) = %.3f\n', statsU.bias);
-%     fprintf('MAE = %.3f, RMSE = %.3f\n', statsU.MAE, statsU.RMSE);
-%     fprintf('R^2 = %.4f, Pearson r = %.4f, Spearman rho = %.4f\n', statsU.R2, statsU.pearson_r, statsU.spearman_rho);
-%     fprintf('Linear fit (pred = a*obs + b): a = %.4f, b = %.4f\n', regU.coeff(1), regU.coeff(2));
-%     fprintf('Bland-Altman: mean diff = %.4f, SD diff = %.4f, LOA = [%.4f, %.4f]\n', baU.mean_diff, baU.sd_diff, baU.lower_LOA, baU.upper_LOA);
-% else
-%     fprintf('No valid paired data for upper comparison.\n');
-% end
-% 
-% fprintf('\nDetailed statistical analysis: Lower (monitorLowerTemp vs riverT)\n');
-% if ~isempty(statsL)
-%     fprintf('N = %d\n', statsL.N);
-%     fprintf('Mean observed = %.3f, Mean predicted = %.3f\n', statsL.mean_obs, statsL.mean_pred);
-%     fprintf('Bias (pred - obs) = %.3f\n', statsL.bias);
-%     fprintf('MAE = %.3f, RMSE = %.3f\n', statsL.MAE, statsL.RMSE);
-%     fprintf('R^2 = %.4f, Pearson r = %.4f, Spearman rho = %.4f\n', statsL.R2, statsL.pearson_r, statsL.spearman_rho);
-%     fprintf('Linear fit (pred = a*obs + b): a = %.4f, b = %.4f\n', regL.coeff(1), regL.coeff(2));
-%     fprintf('Bland-Altman: mean diff = %.4f, SD diff = %.4f, LOA = [%.4f, %.4f]\n', baL.mean_diff, baL.sd_diff, baL.lower_LOA, baL.upper_LOA);
-% else
-%     fprintf('No valid paired data for lower comparison.\n');
-% end
+
 
 % Ensure variables exist and are row vectors of length 24
 %if ~exist('resT','var'), resT = nan(1,totalSteps); end
@@ -713,6 +635,9 @@ fprintf('R^2 (lower: monitor vs riverT) = %.4f\n', R2_lower);
 %if ~exist('downstreamTemp','var'), monitorLowerTemp = nan(1,totalSteps); end
 %if ~exist('resD','var'), resD = nan(1,totalSteps); end
 %if ~exist('monitorUpperTemp','var'), monitorUpperTemp = nan(1,totalSteps); end
+offsetTime = posixtime(startTime);
+
+
 toRow = @(v) reshape(v(1:min(end,totalSteps)),1,[]);
 padTo24 = @(v) (numel(v)<totalSteps) * [v, repmat(v(end),1,totalSteps-numel(v))] + (numel(v)>=totalSteps) * v(1:totalSteps);
 
@@ -777,13 +702,13 @@ plot(hours, turbdat, '-.','LineWidth',1.5);
 plot(hours, pumpdat, '-','LineWidth',1.5);
 plot(hours, diffdat, '-','LineWidth',1.5);
 plot(hours, updat, '-','LineWidth',1.5);
-plot(hours, downdat, '-','LineWidth',1.5);
-
+plot(hours, downdat, '-.','LineWidth',1.5);
+%disp(downdat)
 
 hold off;
 xlabel('Time step');
 ylabel('Value');
-title('Total, Surface, Inflow, Turbine, Diffusion, and Pump Data vs Hour');
+title('Total, Surface, Inflow, Turbine, Diffusion, and Pump Data vs Timestep');
 legend('surfdat','indat','turbdat','pumpdat', 'diffdat','updat', 'downdat','Location','best');
 xlim([1 totalSteps]);
 grid on;
@@ -798,3 +723,18 @@ diffPercentage = mean(diffdat)/mean(updat);
 
 disp(["uppper",surfUpperPercentage,pumpMeanPercentage,inPercentage])
 disp(["lower",surfLowerPercentage,turbMeanPercetnage,diffPercentage])
+% Prepare table and write CSV of time series variables
+% Ensure all vectors are row vectors of length totalSteps
+vars = {'resT','resV','surfdat','indat','turbdat','pumpdat','diffdat','updat','downdat'};
+for k = 1:numel(vars)
+    v = eval(vars{k});
+    v = toRow(v); v = padTo24(v);
+    eval([vars{k} ' = v;']);
+end
+
+timeSteps = (1:totalSteps).';
+T = table(timeSteps, resT(:), resV(:), surfdat(:), indat(:), turbdat(:), ...
+    pumpdat(:), diffdat(:), updat(:), downdat(:), ...
+    'VariableNames', {'TimeStep','resT','resV','surfdat','indat','turbdat','pumpdat','diffdat','updat','downdat'});
+
+writetable(T,'modelOutput.csv');

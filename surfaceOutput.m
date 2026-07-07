@@ -12,8 +12,8 @@
 % not then it uses shortwave penetration
 % wind speed units are m/s
 
-%mon, 8 - 12
-
+%mon 9 - 1 
+%tues 8 - 12
 
 %%
 % hStor = zeros(1,24);
@@ -57,7 +57,7 @@ function output = surfaceOutput(Tair, Ts, Wz, RH, cloudiness,long,lat,z,Jday,HOU
     br = bRCalc(Ts);
     e = evapCalcGenModel(Wz,es,ea);
     c = conductionGenModel(Wz,Tair,Ts);
-    if any(isnan([s, an, br, e, c]), 'all')
+    if any(isnan([s, an, br, e, c]), 'all') || any(isinf([s, an, br, e, c]), 'all')
        warning('NaN detected at heat functions');
        keyboard
     end
@@ -72,7 +72,7 @@ function out = pswMBHcalc(cloudiness,Ba,K1,ta038,ta050,long,lat,Tdpt,z,dayIn,HOU
 % - lat and long are given in degrees (converted to radians internally).
 % - dayIn, HOUR, year, month, TZ as before.
 % Returns out = 0 when sun is below horizon or numerics invalid.
-    if any(isnan([cloudiness, long, lat, Tdpt]), 'all')
+    if any(isnan([cloudiness, long, lat, Tdpt]), 'all') || any(isinf([cloudiness, long, lat, Tdpt]), 'all')
        warning('NaN detected at surface shortwave inputs functions');
        keyboard
     end
@@ -295,7 +295,7 @@ function out = pswMBHcalc(cloudiness,Ba,K1,ta038,ta050,long,lat,Tdpt,z,dayIn,HOU
     if abs(denom_out) < TOL
         denom_out = sign(denom_out) * TOL;
     end
-    if any(isnan([denom_out, directHz, Ias]), 'all')
+    if any(isnan([denom_out, directHz, Ias]), 'all') || any(isinf([denom_out, directHz, Ias]), 'all')
             warning('NaN detected at exhange functions');
             keyboard
     end
@@ -383,7 +383,7 @@ function out = swMBHcalc(cloudiness,Ba,K1,ta038,ta050,long,lat,Tdpt,z,dayIn,HOUR
     % disp(["Taa: ", Taa])
    % rs = 0.0685+(1-Ba)*(1.0-Ta/Taa); % Albedo (dimensionless), Ba is found from table 0.84 is recommended but can change demning on situation
     rs = 0.3;
-    if any(isnan([directHz, Ias, duTInflow, dlTSurface, duTTurb,duTdiff]), 'all')
+    if any(isnan([directHz, Ias, duTInflow, dlTSurface, duTTurb,duTdiff]), 'all') || any(isinf([directHz, Ias, duTInflow, dlTSurface, duTTurb,duTdiff]), 'all')
             warning('NaN detected at exhange functions');
             keyboard
     end
@@ -426,10 +426,16 @@ function out = lwRCalc(Tair,cloudiness) %  net long wave radiation formula.
     out = Oac*(1+k*max(cloudiness)^2) * 0.97; % C is for cloudniess which can be from 0 to 1. 
 end
 %%
-function out = bRCalc(Ts) % back radiation 
-    epsilon = 0.97; % emissivity of water
-    sigma = 5.67*10^-8;
-    out = epsilon*sigma*(Ts + 273.15)^4; % Ts is water temp surface in Celcius
+function out = bRCalc(Ts)
+    epsilon = 0.97;
+    sigma = 5.67e-8;
+    T = Ts + 273.15;
+    in = epsilon*sigma*T.^4;
+    if in == inf
+        error('bR went to infinity');
+    else
+        out = in;
+    end
 end
 %%
 function out = saturationVaporPressureCalc(Tair)
@@ -456,7 +462,7 @@ function out = dewPointTempCalc(vapPressure) % from Magnus formula
     Lambda = 243.12; % in Celcius
     denom = (beta - log(vapPressure/alpha));
     test = (Lambda) * log(vapPressure/alpha) / denom;
-    if any(isnan([vapPressure,denom,test]), 'all')
+    if any(isnan([vapPressure,denom,test]), 'all') || any(isinf([vapPressure,denom,test]), 'all')
        warning('NaN detected at dew point');
        keyboard
     end

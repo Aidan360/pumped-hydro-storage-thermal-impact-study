@@ -7,18 +7,18 @@
 clear; clc;
 datRecord = true;
 % MAX DATA RANGE 3/13/2025 19:00 - 9/24/2025 15:00
-startTime = datetime('5/19/2021 18:00', Format  = 'MM-dd-uuuu HH:mm');
-endTime = datetime('9/22/2021 16:00', Format  = 'MM-dd-uuuu HH:mm');
+startTime = datetime('1/1/2025 0:00', Format  = 'MM-dd-uuuu HH:mm');
+endTime = datetime(' 12/31/2025     23:45', Format  = 'MM-dd-uuuu HH:mm');
 % dataFiles = blanks(1,2025);
-% dataFiles(2021) = 'Dalles2021.xlsx';
+% dataFiles(2021         = 'Dalles2021.xlsx';
 % dataFiles(2022) = 'Dalles2022.xlsx';
 % dataFiles(2023) 
 
-csvFile = 'Dalles2021FilteredData_table.csv';
+csvFile = 'Dalles2025FilteredData_table.csv';
 % copy and paste all data points for ai usage:
 %upstreamTemp inflow outflow discharge downstreamWaterVelocity wZ rH
 %lowCloud highCloud gaugeHeight damElevation damStorage precipitation windDirection
-datFile = 'Dalles2021.xlsx';
+datFile = 'Dalles2025.xlsx';
 % 2025 data range 3/13/2025 19:00 - 9/24/2025 15:00
 % 2024 data range 3/27/2024 16:00 -  9/24/2024 19:00
 % 2023 data range 4/5/2023 23:00 - 9/19/2023 19:00
@@ -28,7 +28,7 @@ gaugeHeight = tableProcess(readtable(datFile,'Sheet',1),1,3); % 1
 outflow = tableProcess(readtable(datFile,'Sheet',2),1,3); %2
 %downstreamWaterVelocity = tableProcess(readtable(datFile,'Sheet',3),1,3);  %3
 downstreamTemp = tableProcess(readtable(datFile,'Sheet',4),1,2); %4
-upstreamTemp = tableProcess(readtable(datFile,'Sheet',5),1,2); %5
+% upstreamTemp = tableProcess(readtable(datFile,'Sheet',5),2,3); %5
 damStorage = tableProcess(readtable(datFile,'Sheet',6),1,3);%6
 damElevation = tableProcess(readtable(datFile,'Sheet',7),1,3);  %7
 inflow = tableProcess(readtable(datFile,'Sheet',8),1,3); %8
@@ -36,11 +36,35 @@ discharge = tableProcess(readtable(datFile,'Sheet',9),1,3); %9
 Tair = tableProcess(readtable(datFile,'Sheet',10),1,2); %10
 rH = tableProcess(readtable(datFile,'Sheet',11),1,2); %11
 windDirection = tableProcess(readtable(datFile,'Sheet',12),1,2); % 12
-wZ = tableProcess(readtable(datFile,'Sheet',13),1,3); %13
+wZ = tableProcess(readtable(datFile,'Sheet',13),1,3); % 12
 precipitation = tableProcess(readtable(datFile,'Sheet',14),1,2); % 14
 skyc1 = tableProcess(readtable(datFile,'Sheet',15),1,5); %15
 skyc2 = tableProcess(readtable(datFile,'Sheet',15),1,6); %15
 skyc3 = tableProcess(readtable(datFile,'Sheet',15),1,7); %15
+spillway = tableProcess(readtable(datFile,'Sheet',16),1,3);
+
+Tf = readtable(csvFile); % filtered data
+timeVar = Tf{:,1};
+tTair =  Tf{:,2}; %[m^3/s]
+tupstreamTemp = Tf{:,3};%[C]
+tdownstreamTemp = Tf{:,4}; %[C]
+tinflow = Tf{:,5}; %[m^3/s]
+toutflow = Tf{:,6}; %[m^3/s]
+tdischarge = Tf{:,7}; %[m^3/s]
+tdownstreamWaterVelocity = Tf{:,8};
+tgaugeHeight = Tf{:,9}; %[ft]
+twZ = Tf{:,10}; %[m/s]
+trH = Tf{:,11}; %[%]
+tlowCloud = Tf{:,12}; 
+thighCloud = Tf{:,13};
+tdamElevation =  Tf{:,14}; %[ft]
+tdamStorage = Tf{:,15}; %[acre*ft]
+train = Tf{:,16}; %{mm]
+twindDirection = Tf{:,17}; % [angle from true north]
+tspillWay = Tf{:,18};
+
+
+
 
 % 
 % 
@@ -51,7 +75,13 @@ if ~exist('downstreamWaterVelocity','var')
 else
     downStreamCalc = false;
 end
-% 
+if ~exist('upstreamTemp','var')
+    disp('replacing upstreamTemp with function')
+    upStreamTempCalc = true;
+else
+    upStreamTempCalc = false;
+end
+% % 
 % % align downstream and upstream by time, interpolate upstream to downstream times
 % % assume downstreamTemp and upstreamTemp are tables with datetime in first col and values in second
 % t_down = downstreamTemp{:,1};
@@ -146,6 +176,9 @@ function outputTable = tableProcess(inputArray,timeLoc,dataLoc) % all arrays are
     valid = validT & validV;
     inputT = inputT(valid);
     inputV = inputV(valid);
+    %disp(inputT)
+    disp(class(inputT))
+    disp(size(inputT))
     if (inputT(end) - inputT(1)) < 0 % checks if its orded last to first 
         inputT = rot90(inputT,2);
         inputV = rot90(inputV,2);
@@ -196,36 +229,88 @@ function outputTable = tableProcess(inputArray,timeLoc,dataLoc) % all arrays are
        % 
        % inputV = cell2mat(inputV);
        else  
-         summary(inputV)
-         class(inputV)
-         disp(dataLoc)
-         pause;
      
        end
     end
-    input = table(inputT, inputV);
+    input = table(inputT,inputV);
     outputTable = input;
 end
 function out = dCheck(in,arr) %faster terminology for interpolation
+    
     % Extract datetime (x) and data (y) columns
     x = arr{:, 1};
     y = arr{:, 2};
-    
     % Find unique x values, their indices, and reverse mapping
     [x_unique, ~, idx] = unique(x, 'stable');
-    
+
     % Resolve duplicates: average the corresponding y values 
     % (You can alternatively use @(v) v(1) to take the first or @(v) v(end) to take the last)
     y_unique = accumarray(idx, y, [], @mean);
-    
+
     % Pass the deduplicated data into interp1
     out = interp1(x_unique, y_unique, in,'linear');
  % out = interp1(arr{:,1},arr{:,2},in,'linear');
 end
+% Create a wrapper that accepts a datetime scalar 'in' and a cell/array of up to 16 tables
+% Each table is assumed to have two columns: {datetime, numeric} or numeric timestamps and numeric values.
+% This wrapper returns a 1xN numeric vector of interpolated values corresponding to each input table.
+function vals = dCheckMany(in, tables)
+    nTables = numel(tables);
+    vals = nan(1,nTables);
+    % Convert query time to numeric seconds since epoch (double)
+    inNum = posixtime(datetime(in));
+    % Process each table; allow GPU arrays inside tables (second column) and datetime first column
+    for k = 1:nTables
+        arr = tables{k};
+        if isempty(arr)
+            vals(k) = NaN;
+            continue
+        end
+        % Extract x and y
+        x = arr{:,1};
+        y = gpuArray(arr{:,2});
+        % Convert x to numeric seconds (gather if gpuArray)
+        if isa(x,'datetime') || isstring(x) || iscell(x)
+            xnum = posixtime(datetime(gatherIfNeeded(x)));
+        else
+            xnum = double(gatherIfNeeded(x));
+        end
+        ynum = double(gatherIfNeeded(y));
+        % If any input is gpuArray, perform dedupe on CPU then move to GPU for interp if supported
+        useGPU = isa(x,'gpuArray') || isa(y,'gpuArray');
+        if useGPU
+            % unique on CPU for reliability, preserve stable order
+            [xu, ~, idx] = unique(gather(xnum),'stable');
+            y_g = gather(ynum);
+            y_unique = accumarray(idx, y_g, [], @mean);
+            xu_gpu = gpuArray(xu);
+            y_gpu = gpuArray(y_unique);
+            outNum = interp1(xu_gpu, y_gpu, gpuArray(inNum), 'linear');
+            vals(k) = gather(outNum);
+        else
+            [xu, ~, idx] = unique(xnum,'stable');
+            y_unique = accumarray(idx, ynum, [], @mean);
+            vals(k) = interp1(xu, y_unique, inNum, 'linear');
+        end
+    end
+
+    function v = gatherIfNeeded(v)
+        if isa(v,'gpuArray')
+            v = gather(v);
+        end
+    end
+end
+
+% Small convenience: build a cell array of the 16 expected tables for use below.
+% Adjust variable names as needed to match workspace variables.
+
+
+% Example single-call function for a datetime 'dt' will be used below in parfor:
+% vals = dCheckMany(dt, tables16);
 if datRecord == true
 
     totalSteps = minutes(endTime - startTime)/15;
-
+    
     nTime    =       NaT(1,totalSteps); 
     nTair =          ones(1,totalSteps);
     nWz   =          ones(1,totalSteps);
@@ -243,36 +328,65 @@ if datRecord == true
     ndamStorage = ones(1,totalSteps);
     nRain = ones(1,totalSteps);
     nwindDirection = ones(1,totalSteps);
-  
-
-
+    nspillWay = ones(1,totalSteps);
+out16 = [ndepthH, nDownStreamTemp, nInflow, ...
+    nOutFlow, nDischarge, ndepthH, nWz, nRH, nlowCloud, nhighCloud, ...
+    ndamElevation, ndamStorage, nRain, nwindDirection, nspillWay];
 
 
 parfor t= 1:totalSteps
+    
     disp(["timeStamp: ", t, "/",totalSteps])
     dt = startTime + minutes((t-1)*15);
     nTime(t) = dt;
     disp(dt) 
-
-    ndepthH(t) = dCheck(dt,gaugeHeight);
-    nupStreamTemp(t) = dCheck(dt,upstreamTemp);
-    nDownStreamTemp(t) = dCheck(dt,downstreamTemp);
-    nTair(t) = dCheck(dt, Tair);
-    nInflow(t) = dCheck(dt, inflow);
-    nOutFlow(t) = dCheck(dt, outflow);
-    nDischarge(t) = dCheck(dt, discharge);
-    nWz(t) = dCheck(dt,wZ);
-    nRH(t) = dCheck(dt,rH);
-    ndamElevation(t) = dCheck(dt,damElevation);
-    nlowCloud(t) = dCheck(dt,skyc1);
+    if ismember(dt,timeVar)
+            disp("true")
+            aP = find(timeVar == dt)
+            nTime(t)    =       timeVar(aP); 
+            nTair(t) =          tTair(aP);
+            nWz(t)   =          twZ(aP);
+            nOutFlow(t) =       toutflow(aP);
+            nRH(t)   =          trH(aP);
+            ndepthH(t) =        tgaugeHeight(aP);
+            nInflow(t) =        tinflow(aP);
+            nDownStreamTemp(t) = tdownstreamTemp(aP);
+            nDischarge(t)      = tdischarge(aP);
+            nlowCloud(t)  =     tlowCloud(aP);
+            %nhighCloud(t) =     thighCloud(aP);
+            ndamElevation(t) =  tdamElevation(aP);
+            ndamStorage(t) = tdamStorage(aP);
+            nRain(t) = train(aP);
+            nwindDirection(t) = twindDirection(aP);
+            nspillWay(t) =  tspillWay(aP)
+    else
+        ndepthH(t) = dCheck(dt,gaugeHeight);
+        nDownStreamTemp(t) = dCheck(dt,downstreamTemp);
+        nTair(t) = dCheck(dt, Tair);
+        nInflow(t) = dCheck(dt, inflow);
+        nOutFlow(t) = dCheck(dt, outflow);
+        nDischarge(t) = dCheck(dt, discharge);
+        nWz(t) = dCheck(dt,wZ);
+        nRH(t) = dCheck(dt,rH);
+        ndamElevation(t) = dCheck(dt,damElevation);
+        nlowCloud(t) = dCheck(dt,skyc1);
+        nhighCloud(t) = max([dCheck(dt,skyc2),dCheck(dt,skyc3)]);
+        ndamStorage(t) = dCheck(dt,damStorage);
+        nwindDirection(t) = dCheck(dt,windDirection);
+        nRain(t) = dCheck(dt,precipitation);
+        nspillWay(t) = dCheck(dt,spillway);
+    end
     nhighCloud(t) = max([dCheck(dt,skyc2),dCheck(dt,skyc3)]);
-    ndamStorage(t) = dCheck(dt,damStorage);
-    nwindDirection(t) = dCheck(dt,windDirection);
-    nRain(t) = dCheck(dt,precipitation);
+    
     if downStreamCalc == false
         ndsWV(t) = dCheck(dt,downstreamWaterVelocity);
     else
         ndsWV(t) = 0.000104602*nDischarge(t)+0.01683; 
+    end
+    if upStreamTempCalc == false
+        nupStreamTemp(t) = dCheck(dt,upstreamTemp);
+    else
+        nupStreamTemp(t) = 0.994594373*nDownStreamTemp(t) + 0.064395157;
     end
 end
 newTable = {nTime,nTair,nupStreamTemp,nDownStreamTemp,nInflow,nOutFlow,nDischarge,ndsWV,ndepthH,nWz,nRH,nlowCloud,nhighCloud};
@@ -285,7 +399,7 @@ writecell(newTable, csvFile);
 % Assemble table with specified variable order and names, ensuring column vectors
 varNames = {'nTime','nTair','nupStreamTemp','nDownStreamTemp','nInflow', ...
     'nOutFlow','nDischarge','ndsWV','ndepthH','nWz','nRH','nlowCloud','nhighCloud', ...
-    'ndamElevation','ndamStorage','nRain','nwindDirection'};
+    'ndamElevation','ndamStorage','nRain','nwindDirection','nspillWay'};
 
 % Ensure nTime is a column of datetimes (if currently NaT row vector)
 if isrow(nTime)
@@ -293,7 +407,7 @@ if isrow(nTime)
 end
 cols = {nTime, nTair(:), nupStreamTemp(:), nDownStreamTemp(:), nInflow(:), ...
     nOutFlow(:), nDischarge(:), ndsWV(:), ndepthH(:), nWz(:), nRH(:), nlowCloud(:), nhighCloud(:), ...
-    ndamElevation(:), ndamStorage(:), nRain(:), nwindDirection(:)};
+    ndamElevation(:), ndamStorage(:), nRain(:), nwindDirection(:), nspillWay(:)};
 
 % Validate lengths: all columns must have same number of rows
 nRows = numel(cols{1});
