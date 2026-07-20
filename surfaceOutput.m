@@ -12,61 +12,38 @@
 % not then it uses shortwave penetration
 % wind speed units are m/s
 
-%mon 9 - 1 
-%tues 8 - 12
+%mon 7-11
 
-%%
-% hStor = zeros(1,24);
-% for h = 1:24
-%     HE = surfaceOut(0,-121.190,45.608,50,6,h,2026,6,-8, 18.3, 15.4,3, 30);
-%     hStor(h) = HE;
-% end
-% figure;
-% plot(1:24,hStor,'-o')
-% xlabel('Index')
-% ylabel('hStor')
-% title('hStor vs 1:23')
-% grid on
-%G = graph(hStor,1:23);
-%plot(G)
-% function output = surfaceOutput(Tair, Ts, Wz,rH,cloudiness)  
-%     es = saturationVaporPressureCalc(Tair);
-%     ea = vaporPressure(rH,es);
-%     br = bRCalc(Ts);
-%     e = evapCalcGenModel(Wz,es,ea);
-%     c = conductionGenModel(Wz,Tair,Ts);
-%     an = lwRCalc(Tair,cloudiness);
-%   %  disp(["an",an,"br",br,"e",e,"c",c])
-% 
-%     output = an-br-e-c;
-% end
-% im going to cry
-function output = surfaceOutput(Tair, Ts, Wz, RH, cloudiness,long,lat,z,Jday,HOUR,yearS,monthS,TZ)
-    es = saturationVaporPressureCalc(Tair);
-    ea = vaporPressure(RH,es);
-    Tdpt = dewPointTempCalc(ea);
+
+function output = surfaceOutput(Tair, Ts, Wz, RH, cloudiness,long,lat,z,Jday,HOUR,yearS,monthS,rain,Cp,density)
+    esWater = saturationVaporPressureCalc(Ts);
+    esAir = saturationVaporPressureCalc(Tair);
+    eaAir = vaporPressureCalc(RH,esAir);
+    Tdpt = dewPointTempCalc(eaAir);
     Ba = 0.84; %Ba is recommended to be 0.84
     K1 = 0.1; %K1 is recommended to be 0.1 unless more data is available
     %We're going to assume its in the pacific north west?? so ta038 and
     %ta050 will be 0.1 and 0.05 (mt vernon stuff)
     ta038 = 0.05;
     ta050 = 0.1;
-    s = pswMBHcalc(cloudiness,Ba,K1,ta038,ta050,long,lat,Tdpt,z,Jday,HOUR,yearS,monthS,TZ); 
-
-    an = lwRCalc(Tair,cloudiness);
-    br = bRCalc(Ts);
-    e = evapCalcGenModel(Wz,es,ea);
-    c = conductionGenModel(Wz,Tair,Ts);
-    if any(isnan([s, an, br, e, c]), 'all') || any(isinf([s, an, br, e, c]), 'all')
-       warning('NaN detected at heat functions');
-       keyboard
-    end
-    output = s + an - br - e - c;
+   s = pswMBHcalc(cloudiness,Ba,K1,ta038,ta050,long,lat,Tdpt,z,Jday,HOUR,yearS,monthS); 
+   % 
+   an = lwRCalc(Tair,cloudiness);
+   br = bRCalc(Ts);
+   e = evapCalcGenModel(Wz,esWater,eaAir);
+   c = conductionGenModel(Wz,Tair,Ts);
+   r = rainModel(rain,RH,Tair,Ts,Cp,density);
+    % if any(isnan([s, an, br, e, c]), 'all') || any(isinf([s, an, br, e, c]), 'all')
+    %    warning('NaN detected at heat functions');
+    %    keyboard
+    % end
+    % output = s;
+    output = s + an - br - e - c + r;
 end
 
 
 
-function out = pswMBHcalc(cloudiness,Ba,K1,ta038,ta050,long,lat,Tdpt,z,dayIn,HOUR,yearS,monthS,TZ)
+function out = pswMBHcalc(cloudiness,Ba,K1,ta038,ta050,long,lat,Tdpt,z,dayIn,HOUR,yearS,monthS)
 % Patched swMBHcalc with defensive checks to avoid unexpected complex values.
 % Assumptions:
 % - lat and long are given in degrees (converted to radians internally).
@@ -96,9 +73,9 @@ function out = pswMBHcalc(cloudiness,Ba,K1,ta038,ta050,long,lat,Tdpt,z,dayIn,HOU
     long = deg2rad(long);
 
     % Time and Julian date calculations
-    day = dayIn - TZ/24;
+    day = dayIn;
     DD = day + HOUR/24;
-    if yearS <= 2
+    if monthS <= 2
         yearS = yearS - 1;
         monthS = monthS + 12;
     end
@@ -125,7 +102,7 @@ function out = pswMBHcalc(cloudiness,Ba,K1,ta038,ta050,long,lat,Tdpt,z,dayIn,HOU
     seconds = 21.448 - t*(46.8150 + t*(0.00059 - 0.001813*t));
     % Correct mean obliquity: 23 degrees 26' seconds -> 23 + 26/60 + seconds/3600
     epsilonO = 23 + 26/60 + seconds/3600;
-    epsilonP = epsilonO + 0.0256 * cos(deg2rad(omega));
+    epsilonP = epsilonO + 0.00256 * cos(deg2rad(omega));
 
     % Convert to radians for trig
     epsilonPr = deg2rad(epsilonP);
@@ -295,10 +272,10 @@ function out = pswMBHcalc(cloudiness,Ba,K1,ta038,ta050,long,lat,Tdpt,z,dayIn,HOU
     if abs(denom_out) < TOL
         denom_out = sign(denom_out) * TOL;
     end
-    if any(isnan([denom_out, directHz, Ias]), 'all') || any(isinf([denom_out, directHz, Ias]), 'all')
-            warning('NaN detected at exhange functions');
-            keyboard
-    end
+    % if any(isnan([denom_out, directHz, Ias]), 'all') || any(isinf([denom_out, directHz, Ias]), 'all')
+    %         warning('NaN detected at exhange functions');
+    %         keyboard
+    % end
     out = (directHz + Ias) ./ denom_out;
     % Force any tiny imaginary parts to zero if numerically insignificant
     if ~isreal(out)
@@ -311,110 +288,7 @@ function out = pswMBHcalc(cloudiness,Ba,K1,ta038,ta050,long,lat,Tdpt,z,dayIn,HOU
         end
     end
 end
-function out = swMBHcalc(cloudiness,Ba,K1,ta038,ta050,long,lat,Tdpt,z,dayIn,HOUR,yearS,month,TZ) % shortwave solar radtion model from Meeus, Bird and hulstrom models
-   
-    day = dayIn - TZ/24; % Jday is julian day, TZ is time zone adjusted to GMT
-    DD = day + HOUR/24;
-    if year <= 2 
-        year = year - 1;
-        month = month + 12;
-    end
-    Ajd = floor(year/100);
-    Bjd = 2 - Ajd + floor(Ajd/4.0);
-    JD = floor(365.25*(year + 4716.0)) + floor(30.6001*(month + 1)) + DD + Bjd - 1524.5;% julian ephermeris day
-    t = (JD - 2451545.0) / 36525.0; % julian centuries
-    eEarth = 0.016708734 - t*(0.000042037 + 0.0000001267*t); % t is the julian centuries. why is there here, idk man 
-    LO = 280.46646 + t*(36000.76983 + 0.0003032*t);
-    M = 357.52911 + t*(35999.05029 - 0.0001537*t); % mean geometric anomoly of the sun
-    c = sin(M) * (1.914602 - t*(0.004817 + 0.000014*t)) + sin(2*M)*(0.019993 - 0.000101*t) + sin(3*M) * 0.000289; % center of the sun
-    TLO = LO + c; % true longitude of the sun
-    omega = 125.04 - 1934.136*t; % longitude correction factor 
-    lambda = TLO - 0.00569 - 0.00478*sin(omega); % apparent longitude of the sun 
-    seconds = 21.448 - t*(46.8150 + t*(0.00059 - 0.001813*t));
-    epsilonO = 23 + 26 + (seconds/60)/60; % mean obliquity of the eliptic
-    epsilonP = epsilonO + 0.0256 * cos(omega); % corrected obliquity of the elliptic
-    delta = asin(sin(epsilonP) * sin(lambda)); % declination of the sun
-    yEQT = (tan(epsilonP / 2))^2;
-    EQT = 4*(yEQT * sin(2*LO) - 2*eEarth*sin(M) + 4*eEarth*yEQT*sin(M)*cos(2*LO) - 0.5*(yEQT^2)*sin(4*LO)-1.25*(eEarth^2)*sin(2*M));
-    trueSolarTime = 60*HOUR + EQT -  4*long;
-    H = trueSolarTime / 4 - 180;
-    Ao = asin(sin(lat)*sin(delta) + cos(lat)*cos(delta)*cos(H)); % Ao is solar altiude
-    if rad2deg(Ao) <= -0.575 
-        RC = (1/3600) * (-20.774 / tan(Ao));
-    elseif rad2deg(Ao) <= 5 
-        RC = (1/3600) * (1735-518.2*Ao + 103.4*Ao^2 - 12.79*Ao^3 + 0.711*Ao^4);
-    elseif rad2deg(Ao) <= 85
-        RC = (1/3600) * (58.1 / tan(Ao) - 0.07/(tan(Ao))^3 + 0.000086 / (tan(Ao))^5);
-    else
-        RC = 0;
-    end
-    AoC = Ao + RC; % Corrected solar altitude, Ao is solar altiude from previous formulas, RC is atmospheric correction. depends on a table 
-    v = M + c;% true anomaly of the sun. M is the mean geometric anomly of the sun and C is the center of the sun. 
-    r = (1.000001018*(1-eEarth^2)) / (1 + eEarth*cos(v)); % e is the eccentricity of earths orbit, v is the true anomaly of the sun
-    Oo = 1361; % W/m^2, Solar Constant
-    Oext = Oo / r^2 * sin(AoC);  
-    mp = ((((288-0.0065*z)) / 288)^5.256) / (sin(AoC) +(0.1500*(AoC+3.885)^-1.253)); % relative optical air mass z is elevation of water body in meters
-    Tr = exp(-0.0903*mp^2 * (1+mp - mp^1.01)); % Transmittance of rayleigh scattering
-    Tum = exp(-0.0127*mp^0.26);% Transmittance of uniformly mixed gases     
-    w = exp(-0.0592 + 0.06912*Tdpt);% preciptable water content in atmosphere Tdpt is dew point temperature
-    Xw = w*mp; % precipitable water content in slanted path
-    Tw = 1 - 2.4959*Xw /((1+79.034*Xw)^0.6828 + 6.385*Xw); % transmittance of the water vapor 
-    Bu = 1.28;
-    if abs(long) == long
-        Pu = 20;
-    else 
-        Pu = 0;
-    end
-    Hu = 3;
-    Fu = -30;
-    Cu = 40; 
-    Au = 150; % northern hemisphere model, i'll program if it isn't later maybe idk
-    Uo = (235 + Au + Cu*sin(0.9856 * round(day) + Fu) + 20*sin(Hu * (long + Pu)) ) * (sin(Bu*lat))^2/1000; % Ozone content by van heulon model
-    Xo = Uo*mp; % Uo is a table value and a calculated value, Uo will be used  
-    To = 1 - 0.1611*Xo*(1 + 139.48*Xo)^-0.3035 - 0.002715*Xo*(1+0.044*Xo + 0.0003*Xo^2)^-1; % Transmittance of ozone content
-    ta = 0.2758*ta038 + 0.35*ta050; % ta038 and ta050 are from tables, 0.2661 and 0.3538 are us standard atmosphere, 0.1 and 0.05 are Mt vernon which will be used
-    
-    Ta = exp((-ta^0.873)*(1+ta-ta^0.7088) * mp^0.9108); % transmittance of aerosol absoprtion and scattering
-    Taa = 1 - K1*(1 - mp + mp^1.06)*(1-Ta); % Transmittance of aerosol absorptance, K1 is a table value. 0.1 is recommended unless aerosol data is available
-    
-    
-    % disp(["Ba: ", Ba]) % this one is fine
-    % disp(["Ta: ", Ta]) % too hihg 
-    % disp(["Taa: ", Taa])
-   % rs = 0.0685+(1-Ba)*(1.0-Ta/Taa); % Albedo (dimensionless), Ba is found from table 0.84 is recommended but can change demning on situation
-    rs = 0.3;
-    if any(isnan([directHz, Ias, duTInflow, dlTSurface, duTTurb,duTdiff]), 'all') || any(isinf([directHz, Ias, duTInflow, dlTSurface, duTTurb,duTdiff]), 'all')
-            warning('NaN detected at exhange functions');
-            keyboard
-    end
-    
-    Ias = 0.79*Oext*Taa*Tw*Tum*To*   ( (0.5*( 1 - Tr ) + Ba*(1 - Ta/Taa))/(1 - mp + mp^1.02)); % scattered solar radiation
-    directHz = 0.9662*Oext*Ta*Tw*Tum*To*Tr; % direct solar radiation
-    
-    % set A and B based on C using a 4-part switch-like structure
-    % cases: C == 0, C in [0.1,0.5], C in [0.6,0.9], C == 1
-    if isequal(cloudiness,0)
-        RtA = 1.18; % set specific value for A when C == 0
-        RtB = -0.77; % set specific value for B when C == 0
-    elseif cloudiness >= 0.1 && cloudiness <= 0.5
-        RtA = 2.20; % set specific value for A when 0.1 <= C <= 0.5
-        RtB = -0.97; % set specific value for B when 0.1 <= C <= 0.5
-    elseif C >= 0.6 && cloudiness <= 0.9
-        RtA = 0.95; % set specific value for A when 0.6 <= C <= 0.9
-        RtB = -0.75; % set specific value for B when 0.6 <= C <= 0.9
-    elseif isequal(cloudiness,1)
-        RtA = 0.33; % set specific value for A when C == 1
-        RtB = -0.45; % set specific value for B when C == 1
-    else
-        error('C must be one of: 0, in [0.1,0.5], in [0.6,0.9], or 1.');
-    end
-    % Aoc should be fine as well
-    Rt = RtA*(rad2deg(Ao))^RtB;% Surface reflectivity, cloudiness coefficents are found in tables, using 1.18 and -0.77 for clear skies
- %   disp(["rs: ", rs]); % typical values of 03 - 0.31, too high  just using values from a textbook, i couldn't be bothered to fix the calculator. 
-    out = (directHz + Ias) / (1 - Rt * rs);
-end
 %%
-
 function out = lwRCalc(Tair,cloudiness) %  net long wave radiation formula.
     sigma = 5.67*10^-8;
     if Tair >= 5 % Swinbank Formula 
@@ -446,7 +320,7 @@ function out = saturationVaporPressureCalc(Tair)
     end
     out = 6.1094*eJ; % From August Roche Magnus formula, assuming it temps don't go below freezing (uh oh)
 end
-function out = vaporPressure(RH,eS)
+function out = vaporPressureCalc(RH,eS)
     vP = eS * (RH/100);
     if vP == 0
        warning('NaN detected at vaporPressure');
@@ -487,6 +361,13 @@ function out = conductionGenModel(Wz,Ta,Ts)
     out = Cc*windSpeedFunctionGenModel(Wz)*(Ts - Ta);
 end
 %%
+function out = rainModel(rain,rH,Ta,Ts,Cp,density)
+    wetBulbTemp = (-5.806+0.672* Ta - 0.006*Ta^2 + (0.061 + 0.004 * Ta + 99*(10^-6) *Ta^2)*rH + ((-33*10^-6) - (5*10^-6) * Ta - (1*10^-7)*(Ta^2))*rH^2); 
+    rainExchange = rain * density * Cp * (wetBulbTemp - Ts) * (1/3600) * (1/1000);
+    out = rainExchange;
+end
+
+
 
 
 % dead model pile

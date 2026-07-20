@@ -1,0 +1,51 @@
+classdef riverClass < handle
+   properties
+      %geometric data and constants 
+      Cp = 0;% [J/kg*k]
+      density = 0;%[kg/m^3]
+      tS = 15*60; % timeStep of everything
+      elevation = 0; % elevation of BOTTOM of control volume
+      % transient data
+      falseVolume = 0; % volume is just a 1m crossectional Area
+      depth = 0;
+      temp = 0;
+      surfaceArea = 0;
+      % table data 
+      flow = 0; 
+      rain = 0;
+      rainCheck = true; % checks if rain will be accounted for in flow rate
+      gaugeIn = 0;
+      velocity = 0;
+   end
+   methods
+       function obj = surfCalc(obj)
+            obj.surfaceArea = L*2*sqrt(h*(2*r-h));
+      end
+      function obj = depthCalc(obj)
+            obj.depth = obj.gaugeIn - obj.elevation;
+      end
+      function obj = volCalc(obj)
+        oobj.flow - 
+      end
+      function obj = updateWaterBalance(obj)
+           obj = obj.depthCalc();
+           obj = obj.surfCalc();
+           obj = obj.volCalc();
+      end
+      function out = outHeatTransfer(obj,tFinal,turb) % watts output
+              if turb == true 
+                qTurb = obj.outCoff * (obj.outflow + obj.spill); % flow out is neg, so positive spillway does stuff idk man
+              else
+                qTurb = 0;
+              end
+              qMix = (obj.temp - tFinal)*-1*obj.outflow*obj.Cp*obj.density; % flow is made positive so heat transfer is pos
+              out = obj.tS*(qTurb + qMix);
+      end
+      function obj = inHeatTransfer(obj,qIn) % watts and volumetric flow Input at output interval
+          % qIn is both surface AND 
+            qPump = obj.tS*obj.inflow * obj.inCoff;
+            obj.temp = obj.temp + (qIn + qPump) / (obj.volume * obj.density * obj.Cp);
+      end
+      
+   end
+end

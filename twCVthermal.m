@@ -5,52 +5,41 @@
 %
 % =========================================================
 clear; clc;
+% Create a simple GUI with a Start button
+
+%{
+Todo list.
+1.  Seperate elevation and depth for stuff. Done 
+2. Establish one storage - elevation - area relationship??? done and or not
+possible?
+3. Add mass balance residual and diagnose storage drift ??  switch to
+cylcindrical model
+4. River reach, doesn't reach not that detailed lol
+5. correct vvapor pressure formulation, yeahhhh i gotta do that
+6. correct date/time solar calculations, huh
+7. theres negative turbine flow?
+
+
+
+
+%}
+
+
+
+
+
+
 %% -------------------------
 % INPUTS
 %% -------------------------
-% Time inputs
-% MAX DATA RANGE
-% 2025: 3/13/2025 19:00 - 9/24/2025 15:00
-
-% csvDat = 'Dalles2025FilteredData_table.csv';
-% startTime = datetime('3/13/2025 19:00', Format  = 'MM-dd-uuuu HH:mm');
-% endTime = datetime('9/24/2025 15:00', Format  = 'MM-dd-uuuu HH:mm');
-%csvDat = 'Dalles2025FilteredData_table.csv'
-% 2024: 3/27/24 16:00 -  9/24/24 19:00
-% csvDat = 'Dalles2024FilteredData_table.csv';
-% startTime = datetime('3/27/2024 16:00', Format  = 'MM-dd-uuuu HH:mm');
-% endTime = datetime('9/24/2024 19:00', Format  = 'MM-dd-uuuu HH:mm');
-% 2023 data range 4/5/23 23:00 - 9/19/23 19:00
-% csvDat = 'Dalles2023FilteredData_table.csv';
-% startTime = datetime('4/5/2023 23:00', Format  = 'MM-dd-uuuu HH:mm');
-% endTime = datetime('9/19/2023 19:00', Format  = 'MM-dd-uuuu HH:mm');
-% 2022 data range 3/30/2022 17:00 - 9/13/2022 21:00
-% csvDat = 'Dalles2022FilteredData_table.csv';
-% startTime = datetime('3/30/2022 17:00', Format  = 'MM-dd-uuuu HH:mm');
-% endTime = datetime('9/13/2022 21:00', Format  = 'MM-dd-uuuu HH:mm');
-% 2021 data range 9/3/2021 19:00 - 9/22/2021 16:00
-
-
-
-
+thirdVol = false; % pumped resivour 
 csvDat = 'Dalles2016-2025FilteredData_table.csv';
 startTime = datetime('1/1/2020 0:00', Format  = 'MM-dd-uuuu HH:mm');
 endTime = datetime(' 12/30/2025 23:45', Format  = 'MM-dd-uuuu HH:mm');
-%% DAM PARAMETERS
-spillwayCrest = 121; %{Ft]
-maxStorage = 554900; %[Acre*ft] by top of flood control
-maxStoragePreFlood = 310000; %[Acre*ft] bottom of flood control storage
-damBed = 55/ 3.281; %[Ft]
-damTop = 185; %[ft]
-floodControlTop = 182.3; %[ft]
-floodControlBottom = 160; %[ft]
-resMaxRadius = 10000; %[m] Resivour Radius at Max depth    
-resMaxDepth     =   (182.3 - 55)/3.281;%[m]        
 
-riverElevation = 77.4/3.281; %[m]
-riverBottom = 55/ 3.281; %[m] from sea level
 
-resivourDir = 46.5; % [Deg]
+
+
 riverDir = 319.59; %[riverDirection]
 
 
@@ -63,13 +52,13 @@ downstreamTemp = Tf{:,4}; %[C]
 inflow = Tf{:,5}; %[m^3/s]
 outflow = Tf{:,6}; %[m^3/s]
 discharge = Tf{:,7}; %[m^3/s]
-downstreamWaterVelocity = Tf{:,8};
+downstreamWaterVelocity = Tf{:,8}; %[m/s]
 gaugeHeight = Tf{:,9}; %[ft]
 wZ = Tf{:,10}; %[m/s]
 rH = Tf{:,11}; %[%]
 lowCloud = Tf{:,12}; 
-highCloud = Tf{:,13};
-damElevation =  Tf{:,14}; %[ft]
+highCloud = Tf{:,13};  
+damElevation =  Tf{:,14}; %[m]
 damStorage = Tf{:,15}; %[acre*ft]
 rain = Tf{:,16}; %{mm]
 windDirection = Tf{:,17}; % [angle from true north]
@@ -95,6 +84,60 @@ long = -121.190;
 lat = 45.608;
 TZ = -8;
 
+% --- Turbine Parameters ---
+
+head = 25; % gotta find a way to get rid of this 
+
+turbineEff = 0.90;    % turbine efficiency   [-]
+pumpEff = 0.85;    % pump efficiency      [-]
+turbmMFR = 10700;        % max turbine flow rate    [m^3/s] using data from dalles dam
+pumpmMFR = 10700;        % max pump flow rate       [m^3/s]
+
+turbHeatCoff = (1 - turbineEff) * waterDensity * g * head; % [J/m^3] 
+pumpHeatCoff = (1 - pumpEff) * waterDensity * g * head; % [J/m^3]
+turbPowerCoff = (turbineEff) * waterDensity * g * head; % [J/m^3] 
+pumpPowerCoff = (pumpEff) * waterDensity * g * head; % [J/m^3]
+
+
+
+%%% DAM PARAMETERS
+
+dam = resivourClass;
+dam.length = 12000;
+dam.resMaxRadius = 12000000;
+dam.resMaxDepth = (182.3 - 55)/3.281;
+dam.Cp = Cp;
+dam.density = waterDensity;
+dam.inEff = 1; % efficiency of pump
+dam.outEff = .9; % efficiency of turbine
+dam.rainCheck = false;
+dam.elevation = 55/3.81; % note elevation is at the BOTTOM OF DAM
+dam.head = -40; % if the base elevation of the dam is the same as the river as stated in the model, then the head is zero
+dam = dam.fullVolCalc();
+
+
+%%% RIVER PARAMETERS
+river = riverClass;
+river.Cp = Cp;
+river.density = waterDensity;
+river.elevation = 55/ 3.281; % elevation from BOTTOM of river
+river.rainCheck = false;
+
+
+%%% RESIVOUR PARAMETERS
+
+res = resivourClass;
+res.resMaxRadius = 5000;
+res.resMaxDepth = 50;
+res.Cp = Cp;
+res.density = waterDensity;
+res.inEff = 0.85;
+res.outEff = 0.9;
+res.rainCheck = true;
+res.spill = 0; % adjusted later in live flow
+res.elevation = dam.elevation + 25;
+
+
 
 
 
@@ -118,164 +161,12 @@ resTControl = ones(1,totalSteps);
 riverT = ones(1,totalSteps); % [C]
 riverTControl = ones(1,totalSteps);
 %riverSA = 0.67*10^6; %[m^2] surface area taken from top of dalles dam 
-% --- Turbine Parameters ---
 
-head = 25; % gotta find a way to get rid of this 
-
-turbineEff = 0.90;    % turbine efficiency   [-]
-pumpEff = 0.85;    % pump efficiency      [-]
-turbmMFR = 10700;        % max turbine flow rate    [m^3/s] using data from dalles dam
-pumpmMFR = 10700;        % max pump flow rate       [m^3/s]
-
-turbHeatCoff = (1 - turbineEff) * waterDensity * g * head; % [J/m^3] 
-pumpHeatCoff = (1 - pumpEff) * waterDensity * g * head; % [J/m^3]
-turbPowerCoff = (turbineEff) * waterDensity * g * head; % [J/m^3] 
-pumpPowerCoff = (pumpEff) * waterDensity * g * head; % [J/m^3]
 % m^3/s * J/m^3 = W
 
 %%-----------------
 % 2. Data Processing
 %%----------------
-% % % 
-% % % datFile = 'Dalles2016-2025.xlsx';
-% % % downstreamTempRaw = tableProcess(readtable(datFile,'Sheet',4),1,2); %4
-% % % upstreamTempRaw = tableProcess(readtable(datFile,'Sheet',5),1,2); %5
-% % % 
-% % % function outputTable = tableProcess(inputArray,timeLoc,dataLoc) % all arrays are processed Tvar Dvar
-% % %     inputT = inputArray{:,timeLoc};
-% % %     inputT = datetime(inputT, Format  = 'MM-dd-yy HH:mm');
-% % %     inputV = inputArray{:,dataLoc};
-% % % 
-% % %     % Remove rows where either time or value is missing/empty
-% % %     % Handle empty strings in cell/char/string arrays for inputV and NaT for inputT
-% % %     % Create logical mask of valid time entries
-% % %     if isdatetime(inputT)
-% % %         validT = ~isnat(inputT);
-% % %     else
-% % %         validT = ~ismissing(inputT);
-% % %     end
-% % % 
-% % %     % Create logical mask of valid value entries
-% % %     if isnumeric(inputV)
-% % %         validV = ~isnan(inputV);
-% % %     elseif iscell(inputV)
-% % %         % cell may contain empty '', <missing>, or NaN
-% % %         validV = true(size(inputV));
-% % %         for ii = 1:numel(inputV)
-% % %             v = inputV{ii};
-% % %             if isempty(v) || (ischar(v) && all(isspace(v))) || (isstring(v) && strlength(v) == 0)
-% % %                 validV(ii) = false;
-% % %             elseif (isnumeric(v) && isnan(v)) || isequal(v,missing)
-% % %                 validV(ii) = false;
-% % %             end
-% % %         end
-% % %     elseif isstring(inputV) || ischar(inputV)
-% % %         validV = ~ismissing(inputV) & strlength(string(inputV))>0;
-% % %     else
-% % %         % fallback: use ismissing
-% % %         validV = ~ismissing(inputV);
-% % %     end
-% % % 
-% % %     % Combine masks and apply to both arrays
-% % %     valid = validT & validV;
-% % %     inputT = inputT(valid);
-% % %     inputV = inputV(valid);
-% % %     %disp(inputT)
-% % %     disp(class(inputT))
-% % %     disp(size(inputT))
-% % %     if (inputT(end) - inputT(1)) < 0 % checks if its orded last to first 
-% % %         inputT = rot90(inputT,2);
-% % %         inputV = rot90(inputV,2);
-% % %     end
-% % %     if isnumeric(inputV) ~= true
-% % % 
-% % %         if iscell(inputV)
-% % %             % Convert cell column that contains scalar numeric entries (possibly as strings)
-% % %             % into a numeric column vector.
-% % %             % Handle cells that are numeric, char, or string scalars.
-% % %             n = numel(inputV);
-% % %             newInputV = nan(n,1);
-% % %             for k = 1:n
-% % %                 val = inputV{k};
-% % %                 if isnumeric(val) && isscalar(val)
-% % %                     newInputV(k) = val;
-% % %                 elseif isstring(val) || ischar(val)
-% % %                     % try numeric conversion from text
-% % %                     num = str2double(string(val));
-% % %                     if ~isnan(num)
-% % %                         newInputV(k) = num;
-% % %                     else
-% % %                         newInputV(k) = NaN;
-% % %                     end
-% % %                 else
-% % %                     % fallback: attempt to convert any other type to double
-% % %                     try
-% % %                         newInputV(k) = double(val);
-% % %                     catch
-% % %                         newInputV(k) = NaN;
-% % %                     end
-% % %                 end
-% % %             end
-% % %             inputV = newInputV;
-% % %        % if iscell(inputV)
-% % %        %      num = size(inputV);
-% % %        %      newInputV = ones(1,num(1));
-% % %        %      disp(inputV)
-% % %        %      size(inputV)
-% % %        %      disp(num(1))
-% % %        %      for n = 1:num(1)
-% % %        %          disp(inputV{n})
-% % %        %          size(inputV{1,n})
-% % %        %          newInputV(n) = inputV{n,1};
-% % %        %      end
-% % %        %      inputV = newInputV;
-% % %        %     disp(inputV)
-% % %        % 
-% % %        % inputV = cell2mat(inputV);
-% % %        else  
-% % % 
-% % %        end
-% % %     end
-% % %     input = table(inputT,inputV);
-% % %     outputTable = input;
-% % % end
-% % % % Extract upstreamTempRaw and downstreamTempRaw from Tf if they exist as tables
-% % % % expecting variables named upstreamTempRaw and downstreamTempRaw in workspace or Tf
-% % % % Each should be Nx2 with datetime in column 1 and data in column 2.
-% % % 
-% % % % Ensure upstreamTempRaw and downstreamTempRaw exist
-% % % if exist('upstreamTempRaw','var') ~= 1 || exist('downstreamTempRaw','var') ~= 1
-% % %     error('upstreamTempRaw and downstreamTempRaw must exist in workspace.');
-% % % end
-% % % 
-% % % % Helper to validate and extract datetime and value columns from a table-like input
-% % % extractAndFilter = @(T, startTime, endTime) deal( ...
-% % %     T{ T{:,1}>=startTime & T{:,1}<=endTime , 1}, ...
-% % %     T{ T{:,1}>=startTime & T{:,1}<=endTime , 2} );
-% % % 
-% % % % If inputs are timetable, convert to table
-% % % if istimetable(upstreamTempRaw)
-% % %     upstreamTempRaw = timetable2table(upstreamTempRaw,'ConvertRowTimes',true);
-% % %     upstreamTempRaw.Properties.VariableNames{1} = 'Var1';
-% % % end
-% % % if istimetable(downstreamTempRaw)
-% % %     downstreamTempRaw = timetable2table(downstreamTempRaw,'ConvertRowTimes',true);
-% % %     downstreamTempRaw.Properties.VariableNames{1} = 'Var1';
-% % % end
-% % % 
-% % % % Filter by startTime and endTime
-% % % uTimes = upstreamTempRaw{:,1};
-% % % dTimes = downstreamTempRaw{:,1};
-% % % 
-% % % uMask = uTimes >= startTime & uTimes <= endTime;
-% % % dMask = dTimes >= startTime & dTimes <= endTime;
-% % % 
-% % % upstreamTempN = upstreamTempRaw(uMask, :);
-% % % downstreamTempN = downstreamTempRaw(dMask, :);
-% % % 
-% % % % Ensure outputs are Nx2 tables with datetime in column1 and data in column2
-% % % upstreamTempRaw = upstreamTempN(:,1:2);
-% % % downstreamTempRaw = downstreamTempN(:,1:2);
 
 surfdat = ones(1,totalSteps);
 pumpdat = ones(1,totalSteps);
@@ -286,6 +177,15 @@ updat = ones(1,totalSteps);
 downdat = ones(1,totalSteps);
 monitorUpperTemp = ones(1,totalSteps);
 monitorLowerTemp = ones(1,totalSteps);
+damEl = ones(1,totalSteps);
+
+contMonitor = ones(1,totalSteps);
+contTrueMonitor = ones(1,totalSteps);
+pumpTypeMonitor = ones(1,totalSteps);
+
+resMonitor = ones(1,totalSteps);
+resDepthMonitor = ones(1,totalSteps);
+
 
 %%------------------
 % 3. Thermal Processes
@@ -308,18 +208,30 @@ for t = 1:totalSteps
    
     if t == 1
         resT(t) = upstreamTemp(aP);
-        riverT(t) = downstreamTemp(aP);
+        dam.temp = resT(t);
+        river.temp = downstreamTemp(aP);
+        riverT(t) = river.temp;
         monitorUpperTemp(t) = upstreamTemp(aP);
         monitorLowerTemp(t) = downstreamTemp(aP);
         resV(t) = damStorage(aP);
+        dam.volume = resV(t);
         resD(t) = damElevation(aP);
+        dam.depth = resD(t);
+        damEl(t) = damElevation(aP);
+        res.depth = 20;
+        res.temp  = dam.temp;
+        resMonitor(t) = res.temp;
+        resDepthMonitor(t) = res.depth;
     else
-        resT(t) = resT(t-1);
-        riverT(t) = riverT(t-1);
-        resD(t) = resD(t - 1);
-        resV(t) = resV(t - 1);
+        resT(t) = dam.temp;
+        riverT(t) = river.temp;
+        resD(t) = dam.depth;
+        resV(t) = dam.volume;
         monitorUpperTemp(t) = upstreamTemp(aP);
         monitorLowerTemp(t) = downstreamTemp(aP);
+        damEl(t) = damElevation(aP);
+        resMonitor(t) = res.temp;
+        resDepthMonitor(t) = res.depth;
     end
     tableData = [ % all transient data 
             Tair(aP) ... % 1
@@ -327,7 +239,7 @@ for t = 1:totalSteps
             outflow(aP),... % 3
             cloudiness,... % 4
             rH(aP), ...% 5
-            0.000104602*discharge(aP)+0.01683,... %downstreamWaterVelocity(aP), ... % 6
+            downstreamWaterVelocity(aP), ... % 6
             gaugeHeight(aP), ... % 7
             inflow(aP), ... % 8
             upstreamTemp(aP),... % 9
@@ -336,10 +248,7 @@ for t = 1:totalSteps
             spillWay(aP),...
             ];
     transientData = [
-            resD(t), ... %1 
-            resT(t), ... %2
             riverT(t), ... %3
-            resV(t)
         ];
         mode = 1;
         % 
@@ -362,22 +271,14 @@ for t = 1:totalSteps
             %     reqFlowRate = -powerReq/pumpPowerCoff;
             % end
             reqFlowRate = -discharge(aP);
-            dT = flowCondition(resMaxRadius,resMaxDepth,riverBottom,Cp,waterDensity,turbHeatCoff,pumpHeatCoff, ...
+            dT = flowCondition( ...
                 transientData,reqFlowRate, ...
-                tableData,dt,riverDir);
-            resT(t) =  dT(1); 
-            riverT(t) = dT(2); 
-            resV(t) = dT(3);
-            resD(t) = dT(4);
-            surfdat(t) = dT(5);
-            indat(t) = dT(6);
-            turbdat(t) = dT(7);
-            pumpdat(t) = dT(8);
-            diffdat(t) = dT(9);
-            updat(t) = dT(10);
-            downdat(t) = dT(11);
-        end
-        if (any(isnan([resT(t), resV(t), resD(t), riverT(t), upstreamTemp(aP)]), 'all') || any(isinf([resT(t), resV(t), resD(t), riverT(t), upstreamTemp(aP)]), 'all'))
+                tableData,dt,riverDir,dam,river,res,thirdVol);
+            pumpTypeMonitor(t) = dT(1);
+            contMonitor(t) = dT(2);
+            contTrueMonitor(t) = dT(3);
+        end 
+        if (any(isnan([resT(t), resV(t), resD (t), riverT(t), upstreamTemp(aP)]), 'all') || any(isinf([resT(t), resV(t), resD(t), riverT(t), upstreamTemp(aP)]), 'all'))
             warning('NaN detected at t=%d', t);
             disp(dt)
             keyboard      % inspect workspace interactively
@@ -385,7 +286,7 @@ for t = 1:totalSteps
         if resT(t) >= 100 || riverT(t) >= 100
             disp('water is boiling')
             break
-        
+
 
         end
 
@@ -403,49 +304,17 @@ heat exchange in resivour
 
 %} 
 % non transient then transient stuff
-% function out = noFlowCondition(rMR,rMD,Cp, ...
-%     depth,lT,uT,resV, ...
-%     t,dt)
-% 
-%     %Proccessing Transient data values
-%     Tair = t(1);
-%     Wz = t(2);
-%     riverDischarge = t(3);
-%     cloudiness = [t(4),t(5)];
-%     rH = t(6);
-%     riverV = t(7);
-%     riverD = t(8);
-%     rain = t(10);
-%     windDirection = t(11);
-%     %Preliminary Area Calculations
-%     resArea = resAreaCalc(depth,rMR,rMD);
-%     riverCrossArea = riverDischarge / riverV; % modeling river as cylinder 
-%     %riverDia = 2*sqrt(riverCrossArea/pi); % river dia, assume river surface area is 1m x river dia area square.
-%     riverDia = rivDiaCalc(riverD,riverCrossArea);
-%     riverSA = riverDia;
-% 
-%     %Surface Heat Transfer
-%     duT = surfaceHeatTransfer(cloudiness,Tair,uT,Wz,Cp,resArea,resV,rH,dt,150); % [°C]
-%     dlT =  surfaceHeatTransfer(cloudiness,Tair,lT,Wz,Cp,riverSA,riverCrossArea,rH,dt,50);
-% 
-%     %Heat Exchange
-%     reT = lT + duT; % new res temp
-%     riT = uT + dlT; % new river temp
-%     out = [reT,riT];
-% end
 
-% 
-function out = flowCondition(rMR,resMaxDepth,riverBottom,Cp,waterDensity,turbHeatCoff,pumpHeatCoff, ...
+
+
+
+
+function out = flowCondition( ...
     tD,flowRate, ...
-    t,dt,rivDirection)
+    t,dt,rivDirection,dam,river,res,thirdVol)
     
-
     %transient data
-    depth = tD(1);
-    lT = tD(2);
-    uT = tD(3);
-    resV = tD(4);
-    disp(resV);
+    lT = tD(1);
     %table data 
     Tair = t(1);
     Wz = t(2);
@@ -459,50 +328,97 @@ function out = flowCondition(rMR,resMaxDepth,riverBottom,Cp,waterDensity,turbHea
     rain = t(11);
     windDirection = t(12);
     spillWay = t(13);
-    %Area Calculations
+    %update Parameters
+    river.gaugeIn = gaugeRiv;
+    river.velocity = riverV;
+    river.flow = riverDischarge;
 
-    newDepth = resDepthCalc(flowRate*15*60 + resInflow*15*60,depth,rMR,resMaxDepth);
-    resArea = resAreaCalc(newDepth,rMR,resMaxDepth);
-    newResV = resV + flowRate*15*60 + resInflow*15*60; %considering 15 minute intervals
-    
-    riverD = gaugeRiv - riverBottom;
-    riverCrossArea = (riverDischarge) / riverV; % modeling river as cylinder 
-    %riverDia = 2*sqrt(riverCrossArea/pi); % river dia, assume river surface area is 1m x river dia area square.
-    riverDia = rivDiaCalc(riverD,riverCrossArea);
-    riverSA = riverDia;
+    if thirdVol == true
+        powerReq = powerOutputSimpleSchedule(hour(dt));
+        %
+        %monitoring variables
+        pumpType = 0; % 0 if nothing, 1 if pumping, -1 if turbining, 0.5 of either if forced
+        if powerReq >= 0
+            res.inflow = 0;
+            res.outflow = -1*powerReq/res.outCoff;
+            pumpType = -1;
+            disp("turbining")
+        elseif powerReq <= 0
+            res.inflow = powerReq/res.inCoff;
+            res.outflow = 0;
+            pumpType = 1;
+            disp("pumping")
+        else
+            res.inflow = 0;
+            res.outflow = 0;
+            pumpType = 0;
+            disp("no flow");
+        end
+        if res.depth >= 25
+            res.inflow = 0;
+            disp("nvm turbining")
+            res.spill = res.surfaceArea/10 * (res.depth - 24);
+            res.outflow = -res.spill + res.outflow;
+            pumpType = -.5;
+        elseif res.depth <= 5
+            res.outflow = 0;
+            disp("nvm filling")
+            res.inflow = 1000;
+            res.spill = 0;
+            pumpType = .5;
+        else
+            res.spill = 0;
+        end
+        disp(["depth",res.depth])
+        dam.inflow = resInflow - res.outflow;
+        % disp(["inflow check",resInflow,dam.inflow])
+        dam.outflow = flowRate - res.inflow;
+        % disp(["outflow check",flowRate,dam.outflow]);
+        dam.spill = spillWay;
+        dam.rain = rain;    
+        res.rain = rain; % trying to see if it fixes it
+        res = res.updateWaterBalance();
+        disp("check for continuity")
+        damStor = (dam.inflow + dam.outflow - res.surfaceArea * res.rain); % checks storage between both dams, rain removed to mimic real
+        damStorTrue = resInflow + flowRate; % the real amount generated.
+        qRes = surfaceHeatTransfer(cloudiness,Tair,res.temp,Wz,res.Cp,res.surfaceArea,rH,dt, 1000,res.rain,0,0,res.density);
+    else
+        dam.inflow = resInflow;
+        dam.outflow = flowRate;
+        dam.spill = spillWay;
+        dam.rain = rain;
+        pumpType = -100;
+        damStor = -1;
+        damStorTrue = -1;
+    end
+    % area stuff
+    dam = dam.updateWaterBalance(); 
+    river = river.updateWaterBalance();
     
     %Surface Heat Transfer
-    duTSurface = surfaceHeatTransfer(cloudiness,Tair,uT,Wz,Cp,resArea,newResV,rH,dt,55/3.81 + depth,rain,0,0,waterDensity); % [°C]
-    dlTSurface = surfaceHeatTransfer(cloudiness,Tair,lT,Wz,Cp,riverSA,riverCrossArea,rH,dt,gaugeRiv,rain,windDirection - rivDirection,riverV,waterDensity); 
-    % Considering river depth not to change from resivour flows
-    Qinflow = (upperTemp-uT)*Cp*resInflow*waterDensity*15*60;
-    duTInflow = Qinflow/(newResV*waterDensity*Cp);
+    qSurfaceDam = surfaceHeatTransfer(cloudiness,Tair,dam.temp,Wz,dam.Cp,dam.surfaceArea,rH,dt, dam.elevation+dam.depth,dam.rain,0,0,dam.density);
+   % qSurfaceRiver = surfaceHeatTransfer(cloudiness,Tair,river.temp,Wz,river.Cp,river.surfaceArea,rH,dt,river.elevation + river.depth,rain,windDirection - rivDirection,river.velocity,river.density); 
 
-    duTPump = 0;
-    duTTurb = 0;
-   if flowRate >= 0 % case one, flowing up to the upper resivour
-        % heat transfer model, river ----> pump -----> resivour
-        Qpump = pumpHeatCoff*(flowRate)*15*60; %[W], 
-        Qriv = (lT-uT)*Cp*flowRate*waterDensity*15*60; %[W] considering 15 min intervals
-        duTdiff = Qriv/(riverDischarge*15*60 * waterDensity *Cp);
-        duTPump = Qpump/(newResV * waterDensity *Cp);
-        duT = duTSurface + duTPump+duTInflow+ duTdiff;
-        dlT = dlTSurface;
+    qInflow = (upperTemp-dam.temp)*dam.Cp*dam.inflow*dam.density*dam.tS;
+    % qInflow = 0;
+    if thirdVol == true
+        dam.outflow = -res.inflow;
+        resInflowq = dam.outHeatTransfer(res.temp,false);
+        res = res.inHeatTransfer(resInflowq + qRes);
+        disp("res temp")
+        disp(res.temp)
+    
+        dam.outflow = flowRate - res.inflow;
+        resOutflowq = res.outHeatTransfer(dam.temp,true);
+    %resOutflowq = 0;
+        qDam = outHeatTransfer(dam,lT,true);
+        dam = dam.inHeatTransfer(qSurfaceDam + qInflow + resOutflowq);
     else
-        Qturb = turbHeatCoff*-1*(flowRate+spillWay)*15*60;
-        Qres = (uT-lT)*Cp*flowRate*waterDensity*15*60;
-        duTTurb = Qturb/(riverDischarge*15*60 * waterDensity *Cp);
-        duTdiff = Qres/(riverDischarge*15*60 * waterDensity *Cp);
-        duT = duTSurface + duTInflow;
-        dlT = dlTSurface + duTTurb+duTdiff;
-        if any(isnan([duT, duTSurface, duTInflow, dlTSurface, duTTurb,duTdiff]), 'all') || any(isinf([duT, duTSurface, duTInflow, dlTSurface, duTTurb,duTdiff]), 'all')
-            warning('NaN detected at exhange functions');
-            keyboard
-        end
-   end
-    reT = lT + duT; % new res temp
-    riT = uT + dlT; % new river temp
-    out = [reT,riT,newResV,newDepth,duTSurface,duTInflow,duTTurb,duTPump,duTdiff,duT,dlT];
+        qDam = outHeatTransfer(dam,lT,true);
+        dam = dam.inHeatTransfer(qSurfaceDam + qInflow);
+    end
+    river = river.inHeatTransfer(qDam);
+    out = [pumpType,damStor,damStorTrue];
   
 
 end
@@ -511,14 +427,15 @@ end
 %% ----------------
 % 4. Background Functions
 %% ----------------
+
 % note, considers 15 minute intervals between
-function out = surfaceHeatTransfer(cloudiness,Tair,Ts,Wz,Cp,surfaceArea,volume,rH,dt,z,rain,windDirection,riverSpeed,waterDensity) % ~ = solar rad
+function out = surfaceHeatTransfer(cloudiness,Tair,Ts,Wz,Cp,surfaceArea,rH,dt,z,rain,windDirection,riverSpeed,waterDensity) % ~ = solar rad
    % heatExchange = solarRad + surfaceOutput(Tair,Ts,Wz,rH,0.5);
+   % https://www.weather.gov/media/tsa/pdf/WBGTpaper2.pdf 
     long = -121.190;
     lat = 45.608;
-    TZ = -8;  
     Jday = day(dt);
-    HOUR = hour(dt);
+    HOUR = hour(dt) + minute(dt)/60;
     monthS = month(dt);
     yearS = year(dt);
     beta = deg2rad(windDirection);
@@ -527,53 +444,28 @@ function out = surfaceHeatTransfer(cloudiness,Tair,Ts,Wz,Cp,surfaceArea,volume,r
     else
          WzC = Wz - cos(beta)* riverSpeed;
     end
-    heatExchange = surfaceOutput(Tair, Ts, WzC, rH,cloudiness,long,lat,z,Jday,HOUR,yearS,monthS,TZ);
-    rainExchange = surfaceArea*rain * waterDensity * Cp * (Tair - Ts) * (1/3600) * (1/1000) * 60 * 15;
+    heatExchange = surfaceOutput(Tair, Ts, WzC, rH,cloudiness,long,lat,z,Jday,HOUR,yearS,monthS,rain,Cp,waterDensity);
 
     Q = (heatExchange)*surfaceArea*60*15;
-    if volume <= 0
-        volume = 1;
-        %error('volume <= 0 in surfaceHeatTransfer');
-    end
-    out = (Q+rainExchange)/(volume * waterDensity *Cp);
+    out = Q; % output in WATTS
 end
 
 
-
-
-
-
-function out = resDepthCalc(flowRate,depth,resMaxRadius,resMaxDepth) % changes depth depending on flow rate to deter
-    % L = resLength;
-    % r = resMaxRadius;
-    % h = depth;
-    %Vder = L*2*sqrt(h*(2*r -h));
-    Vder = pi * (resMaxRadius^2)/(resMaxDepth^2) * depth * (2*resMaxDepth - depth);
-    
-    if Vder == 0
-        out = depth; % no change or handle appropriately
-     else
-        out = depth - (flowRate)/Vder;
-    end
-    % out = depth - (flowRate)/Vder;
-    
-end
-% function out = resRadCalc(depth,rMR,rMD)
-%     out = rMR*sqrt(1 - ((rMD - depth)^2 / rMD^2)); % for whatever reason resMaxRadius is not defined??
-% 
-% end
-function out = resAreaCalc(h,r,L)
-    out = L*2*sqrt(h*(2*r-h));
-end
-
-
-function out = powerOutputSimpleSchedule(hourTime)
-    out = 500*cos((pi/12) * hourTime + 14.5);
+function out = powerOutputSimpleSchedule(hourTime) %output JOULES
+    out = 74*1000*10*cos((pi/12) * hourTime + 14.5);
 end
 function out = rivDiaCalc(depth,crossArea)
 
     out = 2*crossArea/(pi*depth);
 end
+
+
+function out = evaporation()
+    out = N * u * (es - ea) % coeff * wind in km/day * mb * m, out = cm/day
+    % https://www.nrcs.usda.gov/sites/default/files/2023-06/8a_MT_estimation_evaporation_ponds-impound.pdf
+    % 
+end
+
 
 %% ----------------
 % 5. Plotting and post processing
@@ -627,14 +519,7 @@ fprintf('R^2 (upper: monitor vs resT) = %.4f\n', R2_upper);
 fprintf('R^2 (lower: monitor vs riverT) = %.4f\n', R2_lower);
 
 
-% Ensure variables exist and are row vectors of length 24
-%if ~exist('resT','var'), resT = nan(1,totalSteps); end
-%if ~exist('resTControl','var'), resTControl = nan(1,totalSteps); end
-%if ~exist('riverT','var'), riverT = nan(1,totalSteps); end
-%if ~exist('riverTControl','var'), riverTControl = nan(1,totalSteps); end
-%if ~exist('downstreamTemp','var'), monitorLowerTemp = nan(1,totalSteps); end
-%if ~exist('resD','var'), resD = nan(1,totalSteps); end
-%if ~exist('monitorUpperTemp','var'), monitorUpperTemp = nan(1,totalSteps); end
+
 offsetTime = posixtime(startTime);
 
 
@@ -652,89 +537,184 @@ upstreamTemp = padTo24(toRow(monitorUpperTemp));
 figure('Units','normalized','Position',[0.1 0.1 0.7 0.6]);
 
 % Top-left: resT and resTControl
-subplot(2,2,1);
+subplot(3,2,1);
 plot(hours,resT,'-','LineWidth',1.5); hold on;
 plot(hours,upstreamTemp,'-','LineWidth',1.5);
 hold off;
 xlabel('Time step');
-ylabel('Reservoir Temp (°C)');
-title('Reservoir Temperature vs Hour');
+ylabel('Dam Temp (°C)');
+title('Dam Temperature vs Timestep');
 legend('resT','upperTemp','Location','best');
 xlim([1 totalSteps]);
 grid on;
 
 % Bottom-left: riverT, riverTControl, rivControlTemp
-subplot(2,2,3);
+subplot(3,2,3);
 plot(hours,riverT,'-s','LineWidth',1.5); hold on;
 plot(hours,downstreamTemp,'-.','LineWidth',1.5);
 hold off;
 xlabel('Time step');
 ylabel('Temperature (°C)');
 legend('riverT','downstreamTemp','Location','best');
-title('River Temperatures vs Hour');
+title('River Temperatures vs Timestep');
+xlim([1 totalSteps]);
+grid on;
+
+subplot(3,2,5);
+plot(hours,resMonitor,'-s','LineWidth',1.5); hold on;
+hold off;
+xlabel('Time step');
+ylabel('Temperature (°C)');
+legend('resMonitor','Location','best');
+title('Resivour Temperatures vs Timestep');
 xlim([1 totalSteps]);
 grid on;
 
 % Right column (merged): reservoir depth
-subplot(2,2,[2 4]);
+subplot(3,2,[2,4]);
 plot(hours,resD,'-^','LineWidth',1.5,'Color',[0.85 0.33 0.1]);
-xlabel('Time step');
-ylabel('Reservoir Depth (m)');
-title('Reservoir Depth vs Hour');
-xlim([1 totalSteps]);
-grid on;
-
-
-% Plot surfdat, indat, turbdat, and pumpdat vs hours on a new figure
-figure('Units','normalized','Position',[0.15 0.15 0.6 0.5]);
-% Ensure vectors exist and are row vectors of length totalSteps
-padRow = @(v) padTo24(toRow(v));
-surfdat = padRow(surfdat);
-indat = padRow(indat);
-turbdat = padRow(turbdat);
-pumpdat = padRow(pumpdat);
-diffdat = padRow(diffdat);
-updat = padRow(updat);
-downdat = padRow(downdat);
-plot(hours, surfdat, '-','LineWidth',1.5); hold on;
-plot(hours, indat,  '-','LineWidth',1.5);
-plot(hours, turbdat, '-.','LineWidth',1.5);
-plot(hours, pumpdat, '-','LineWidth',1.5);
-plot(hours, diffdat, '-','LineWidth',1.5);
-plot(hours, updat, '-','LineWidth',1.5);
-plot(hours, downdat, '-.','LineWidth',1.5);
-%disp(downdat)
-
+hold on;
+if exist('damEl','var')
+    damElRow = padTo24(toRow(damEl));
+    plot(hours, damElRow, '-','LineWidth',1.5,'Color',[0 0.45 0.74]);
+    legendEntries = legend;
+    if isempty(legendEntries)
+        legend('resD','damEl','Location','best');
+    else
+        % update existing legend to include damEl
+        existing = legendEntries.String;
+        legend([existing, {'damEl'}],'Location','best');
+    end
+end
 hold off;
 xlabel('Time step');
-ylabel('Value');
-title('Total, Surface, Inflow, Turbine, Diffusion, and Pump Data vs Timestep');
-legend('surfdat','indat','turbdat','pumpdat', 'diffdat','updat', 'downdat','Location','best');
+ylabel('Dam Depth (m)');
+title('Dam Depth vs Timestep');
 xlim([1 totalSteps]);
 grid on;
 
-surfUpperPercentage = mean(surfdat)/ mean(updat);
-surfLowerPercentage = mean(surfdat)/ mean(downdat);
-pumpMeanPercentage = mean(pumpdat)/mean(updat);
-turbMeanPercetnage = mean(turbdat)/mean(downdat);
-inPercentage = mean(indat)/mean(updat);
-diffPercentage = mean(diffdat)/mean(updat);
+subplot(3,2,6);
+plot(hours,resDepthMonitor,'-s','LineWidth',1.5); hold on;
+hold off;
+xlabel('Time step');
+ylabel('depth (m)');
+legend('Resivour Depth (m)','Location','best');
+title('Resivour Temperatures vs Timestep');
+xlim([1 totalSteps]);
+grid on;
 
+% Additional figure: pumpTypeMonitor (right), contMonitor vs contTrueMonitor (top-left),
+% and percent difference (bottom-left)
 
-disp(["uppper",surfUpperPercentage,pumpMeanPercentage,inPercentage])
-disp(["lower",surfLowerPercentage,turbMeanPercetnage,diffPercentage])
-% Prepare table and write CSV of time series variables
-% Ensure all vectors are row vectors of length totalSteps
-vars = {'resT','resV','surfdat','indat','turbdat','pumpdat','diffdat','updat','downdat'};
-for k = 1:numel(vars)
-    v = eval(vars{k});
-    v = toRow(v); v = padTo24(v);
-    eval([vars{k} ' = v;']);
+% Prepare vectors as row, padded to totalSteps
+if thirdVol == true
+
+% Plot contMonitor and contTrueMonitor vs time in a new figure
+figure('Units','normalized','Position',[0.2 0.2 0.5 0.4]);
+plot(hours, contMonitor, '-','LineWidth',1.5); hold on;
+plot(hours, contTrueMonitor, '--','LineWidth',1.5);
+hold off;
+xlabel('Time step');
+ylabel('Controller Value');
+title('contMonitor vs contTrueMonitor');
+legend('contMonitor','contTrueMonitor','Location','best');
+xlim([1 totalSteps]);
+grid on;
+iCheck = ones(1,totalSteps);
+for a = 1:totalSteps
+    iCheck(a) = (((contMonitor(a) - contTrueMonitor(a)) / contTrueMonitor(a)) * 100);
 end
+figure('Units','normalized','Position',[0.2 0.2 0.5 0.4]);
+plot(hours, iCheck, '-','LineWidth',1.5); hold on;
+hold off;
+xlabel('Time step');
+ylabel('Controller Value');
+title('diff check');
+legend('contMonitor','contTrueMonitor','Location','best');
+xlim([1 totalSteps]);
+grid on;
 
-timeSteps = (1:totalSteps).';
-T = table(timeSteps, resT(:), resV(:), surfdat(:), indat(:), turbdat(:), ...
-    pumpdat(:), diffdat(:), updat(:), downdat(:), ...
-    'VariableNames', {'TimeStep','resT','resV','surfdat','indat','turbdat','pumpdat','diffdat','updat','downdat'});
+figure('Units','normalized','Position',[0.2 0.2 0.5 0.4]);
+plot(hours, pumpTypeMonitor, '-','LineWidth',1.5); hold on;
+hold off;
+xlabel('Time step');
+ylabel('Controller Value');
+title('diff check');
+legend('contMonitor','contTrueMonitor','Location','best');
+xlim([1 totalSteps]);
+grid on;
+end
+% % 
+% % % Plot surfdat, indat, turbdat, and pumpdat vs hours on a new figure
+% % figure('Units','normalized','Position',[0.15 0.15 0.6 0.5]);
+% % % Ensure vectors exist and are row vectors of length totalSteps
+% % padRow = @(v) padTo24(toRow(v));
+% % surfdat = padRow(surfdat);
+% % indat = padRow(indat);
+% % turbdat = padRow(turbdat);
+% % pumpdat = padRow(pumpdat);
+% % diffdat = padRow(diffdat);
+% % updat = padRow(updat);
+% % downdat = padRow(downdat);
+% % plot(hours, surfdat, '-','LineWidth',1.5); hold on;
+% % plot(hours, indat,  '-','LineWidth',1.5);
+% % plot(hours, turbdat, '-.','LineWidth',1.5);
+% % plot(hours, pumpdat, '-','LineWidth',1.5);
+% % plot(hours, diffdat, '-','LineWidth',1.5);
+% % plot(hours, updat, '-','LineWidth',1.5);
+% % plot(hours, downdat, '-.','LineWidth',1.5);
+% % %disp(downdat)
+% % 
+% % hold off;
+% % xlabel('Time step');
+% % ylabel('Value');
+% % title('Total, Surface, Inflow, Turbine, Diffusion, and Pump Data vs Timestep');
+% % legend('surfdat','indat','turbdat','pumpdat', 'diffdat','updat', 'downdat','Location','best');
+% % xlim([1 totalSteps]);
+% % grid on;
+% % 
+% % surfUpperPercentage = mean(surfdat)/ mean(updat);
+% % surfLowerPercentage = mean(surfdat)/ mean(downdat);
+% % pumpMeanPercentage = mean(pumpdat)/mean(updat);
+% % turbMeanPercetnage = mean(turbdat)/mean(downdat);
+% % inPercentage = mean(indat)/mean(updat);
+% % diffPercentage = mean(diffdat)/mean(updat);
+% % 
+% % 
+% % disp(["uppper",surfUpperPercentage,pumpMeanPercentage,inPercentage])
+% % disp(["lower",surfLowerPercentage,turbMeanPercetnage,diffPercentage])
+% % % Prepare table and write CSV of time series variables
+% % % Ensure all vectors are row vectors of length totalSteps
+% % vars = {'resT','resV','surfdat','indat','turbdat','pumpdat','diffdat','updat','downdat'};
+% % for k = 1:numel(vars)
+% %     v = eval(vars{k});
+% %     v = toRow(v); v = padTo24(v);
+% %     eval([vars{k} ' = v;']);
+% % end
+% % 
+% % timeSteps = (1:totalSteps).';
+% % T = table(timeSteps, resT(:), resV(:), surfdat(:), indat(:), turbdat(:), ...
+% %     pumpdat(:), diffdat(:), updat(:), downdat(:), ...
+% %     'VariableNames', {'TimeStep','resT','resV','surfdat','indat','turbdat','pumpdat','diffdat','updat','downdat'});
+% % 
+% % writetable(T,'modelOutput.csv');
 
-writetable(T,'modelOutput.csv');
+%% JUNK FROM TESTING
+
+
+
+
+
+%% all of these are not being used anymore
+spillwayCrest = 121; %{Ft]
+maxStorage = 554900; %[Acre*ft] by top of flood control
+maxStoragePreFlood = 310000; %[Acre*ft] bottom of flood control storage
+damBed = 55/ 3.281; %[Ft]
+damTop = 185; %[ft]
+floodControlTop = 182.3; %[ft]
+floodControlBottom = 160; %[ft]
+resMaxRadius = 10000; %[m] Resivour Radius at Max depth    
+resMaxDepth     =   (182.3 - 55)/3.281;%[m]        
+
+
+resivourDir = 46.5; % [Deg]

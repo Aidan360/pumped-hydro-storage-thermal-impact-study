@@ -4,6 +4,19 @@
 % 
 %
 % =========================================================
+
+%% ISSUES I NEED TO FIX OTHER THEN WHAT NORA SAID
+% wetbulb temp for rain 
+% fix the magnus roche for zero celcius
+% the broken stuff in pre 2020
+% the density thing 
+
+
+
+
+
+
+
 clear; clc;
 datRecord = true;
 % MAX DATA RANGE 3/13/2025 19:00 - 9/24/2025 15:00
