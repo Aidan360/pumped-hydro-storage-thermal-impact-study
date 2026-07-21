@@ -18,6 +18,8 @@ classdef resivourClass < handle
       surfaceArea = 0;
       inCoff = 0;
       outCoff = 0;
+      riverHeight = 0;
+      evap = 0;
       % table data 
       inflow = 0; % flow in is POSITIVE
       outflow = 0; % flow out is NEGATIVE 
@@ -51,27 +53,41 @@ classdef resivourClass < handle
                 obj.depth = obj.depth + (obj.inflow + obj.outflow)*obj.tS/Vder;
             end
       end
+
+
+      function obj = cubicDepthCalc(obj)
+            % p1 = -1.86691*10^-16;
+            % p2 = 1.49139*10^-7;
+            % p3 = 18.225;
+            obj.depth = -1.86691*10^-16*obj.volume + 1.49139*10^-7*obj.volume + 18.225;
+      end
+      function obj = cubicSurfaceCalc(obj)
+            obj.surfaceArea = obj.volume / obj.depth;
+      end
       function obj = volCalc(obj)
          if obj.rainCheck == true
-            obj.volume = obj.volume + obj.tS*(obj.rain*obj.surfaceArea + obj.inflow + obj.outflow);
+            obj.volume = obj.volume + obj.tS*(obj.rain*obj.surfaceArea + obj.inflow + obj.outflow - obj.evap);
          else
-            obj.volume = obj.volume + obj.tS*(obj.inflow + obj.outflow);
+            obj.volume = obj.volume + obj.tS*(obj.inflow + obj.outflow - obj.evap);
          end
       end
       function out = volFromDepthCalc(obj)
             out = pi * obj.resMaxRadius^2/obj.resMaxDepth^2 * obj.resMaxDepth * (obj.resMaxDepth*obj.depth^2 - obj.depth^3/3); 
       end
       function obj = turbPumpCalc(obj)
-            obj.inCoff =  (1 - obj.inEff) * obj.density * 9.806 * (obj.depth + obj.head);
-            obj.outCoff = (1 - obj.outEff) * obj.density * 9.806 * (obj.depth + obj.head); % [J/m^3] 
+            obj.inCoff =  (1 - obj.inEff) * obj.density * 9.806 * (obj.depth + obj.head - obj.riverHeight);
+            obj.outCoff = (1 - obj.outEff) * obj.density * 9.806 * (obj.depth + obj.head - obj.riverHeight); % [J/m^3] 
       end
       
       function obj = updateWaterBalance(obj)
-           % obj = obj.troughDepthCalc();
-           % obj = obj.troughSurfCalc();
-          obj = obj.depthCalc();
-          obj = obj.surfCalc();
+           obj = obj.troughDepthCalc();
+           obj = obj.troughSurfCalc();
+           %obj = obj.depthCalc();
+           %obj = obj.surfCalc();
            obj = obj.volCalc();
+           %obj = obj.cubicDepthCalc();
+           %obj = obj.cubicSurfaceCalc();
+           %obj = obj.surfCalc();
            obj = obj.turbPumpCalc();
       end
       function out = outHeatTransfer(obj,tFinal,turb) % watts output
@@ -88,6 +104,10 @@ classdef resivourClass < handle
             qPump = obj.tS*obj.inflow * obj.inCoff;
             obj.temp = obj.temp + (qIn + qPump) / (obj.volume * obj.density * obj.Cp);
       end
-      
+      function out = evaporation()
+            out = N * u * (es - ea) % coeff * wind in km/day * mb * m, out = cm/day
+            % https://www.nrcs.usda.gov/sites/default/files/2023-06/8a_MT_estimation_evaporation_ponds-impound.pdf
+            % 
+     end
    end
 end

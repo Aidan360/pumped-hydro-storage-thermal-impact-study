@@ -34,6 +34,7 @@ cylcindrical model
 %% -------------------------
 thirdVol = false; % pumped resivour 
 csvDat = 'Dalles2016-2025FilteredData_table.csv';
+%csvDat = 'Dalles2025FilteredData_table.csv';
 startTime = datetime('1/1/2020 0:00', Format  = 'MM-dd-uuuu HH:mm');
 endTime = datetime(' 12/30/2025 23:45', Format  = 'MM-dd-uuuu HH:mm');
 
@@ -103,8 +104,8 @@ pumpPowerCoff = (pumpEff) * waterDensity * g * head; % [J/m^3]
 %%% DAM PARAMETERS
 
 dam = resivourClass;
-dam.length = 12000;
-dam.resMaxRadius = 12000000;
+dam.length = 39.36*100;
+dam.resMaxRadius = 800;
 dam.resMaxDepth = (182.3 - 55)/3.281;
 dam.Cp = Cp;
 dam.density = waterDensity;
@@ -113,7 +114,7 @@ dam.outEff = .9; % efficiency of turbine
 dam.rainCheck = false;
 dam.elevation = 55/3.81; % note elevation is at the BOTTOM OF DAM
 dam.head = -40; % if the base elevation of the dam is the same as the river as stated in the model, then the head is zero
-dam = dam.fullVolCalc();
+%dam = dam.fullVolCalc();
 
 
 %%% RIVER PARAMETERS
@@ -185,8 +186,6 @@ pumpTypeMonitor = ones(1,totalSteps);
 
 resMonitor = ones(1,totalSteps);
 resDepthMonitor = ones(1,totalSteps);
-
-
 %%------------------
 % 3. Thermal Processes
 %%------------------
@@ -215,8 +214,11 @@ for t = 1:totalSteps
         monitorLowerTemp(t) = downstreamTemp(aP);
         resV(t) = damStorage(aP);
         dam.volume = resV(t);
+        
         resD(t) = damElevation(aP);
+        
         dam.depth = resD(t);
+        dam = dam.troughSurfCalc();
         damEl(t) = damElevation(aP);
         res.depth = 20;
         res.temp  = dam.temp;
@@ -332,6 +334,13 @@ function out = flowCondition( ...
     river.gaugeIn = gaugeRiv;
     river.velocity = riverV;
     river.flow = riverDischarge;
+    dam.riverHeight = river.depth;
+    esWater = rTools.saturationVaporPressureCalc(dam.temp);
+    esAir = rTools.saturationVaporPressureCalc(Tair);
+    eaAir = rTools.vaporPressureCalc(rH,esAir);
+    dam.evap = surfaceEvaporation(esWater,eaAir,Wz,dam.surfaceArea);
+
+
 
     if thirdVol == true
         powerReq = powerOutputSimpleSchedule(hour(dt));
@@ -392,7 +401,9 @@ function out = flowCondition( ...
         damStorTrue = -1;
     end
     % area stuff
+    
     dam = dam.updateWaterBalance(); 
+    
     river = river.updateWaterBalance();
     
     %Surface Heat Transfer
@@ -460,12 +471,12 @@ function out = rivDiaCalc(depth,crossArea)
 end
 
 
-function out = evaporation()
-    out = N * u * (es - ea) % coeff * wind in km/day * mb * m, out = cm/day
-    % https://www.nrcs.usda.gov/sites/default/files/2023-06/8a_MT_estimation_evaporation_ponds-impound.pdf
-    % 
-end
 
+
+function out = drainage() 
+    out = 1; % Drainage area  = 237,000 square miles https://www.nwd-wc.usace.army.mil/dd/common/projects/www/tda.html 
+    % seepage considered 200 second feet? 
+end
 
 %% ----------------
 % 5. Plotting and post processing
@@ -644,6 +655,32 @@ legend('contMonitor','contTrueMonitor','Location','best');
 xlim([1 totalSteps]);
 grid on;
 end
+
+% Plot reservoir volume (resV) and dam storage vs time on a new figure
+figure('Units','normalized','Position',[0.15 0.15 0.6 0.4]);
+% Ensure row vectors of length totalSteps
+resVrow = padTo24(toRow(resV));
+if exist('damStorage','var')
+    damStorRow = padTo24(toRow(damStorage));
+else
+    % if damStorage not provided, compute from resD and area approximation if available
+    if exist('resD','var') && exist('resMaxDepth','var') && exist('resMaxRadius','var')
+        % simple cylindrical approximation: volume = area * depth
+        area = pi * resMaxRadius^2;
+        damStorRow = area .* padTo24(toRow(resD));
+    else
+        damStorRow = nan(1,totalSteps);
+    end
+end
+plot(hours, resVrow, '-o','LineWidth',1.5); hold on;
+plot(hours, damStorRow, '-s','LineWidth',1.5);
+hold off;
+xlabel('Time step');
+ylabel('Volume (m^3)');
+title('Reservoir Volume and Dam Storage vs Timestep');
+legend('resV','damStorage','Location','best');
+xlim([1 totalSteps]);
+grid on;
 % % 
 % % % Plot surfdat, indat, turbdat, and pumpdat vs hours on a new figure
 % % figure('Units','normalized','Position',[0.15 0.15 0.6 0.5]);

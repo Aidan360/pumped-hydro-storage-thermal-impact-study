@@ -113,7 +113,7 @@ dam.outEff = .9; % efficiency of turbine
 dam.rainCheck = false;
 dam.elevation = 55/3.81; % note elevation is at the BOTTOM OF DAM
 dam.head = -40; % if the base elevation of the dam is the same as the river as stated in the model, then the head is zero
-dam = dam.fullVolCalc();
+%dam = dam.fullVolCalc();
 
 
 %%% RIVER PARAMETERS
@@ -185,8 +185,6 @@ pumpTypeMonitor = ones(1,totalSteps);
 
 resMonitor = ones(1,totalSteps);
 resDepthMonitor = ones(1,totalSteps);
-
-
 %%------------------
 % 3. Thermal Processes
 %%------------------
@@ -332,6 +330,7 @@ function out = flowCondition( ...
     river.gaugeIn = gaugeRiv;
     river.velocity = riverV;
     river.flow = riverDischarge;
+    dam.riverHeight = river.depth;
 
     if thirdVol == true
         powerReq = powerOutputSimpleSchedule(hour(dt));
@@ -461,9 +460,15 @@ end
 
 
 function out = evaporation()
-    
+    out = N * u * (es - ea) % coeff * wind in km/day * mb * m, out = cm/day
+    % https://www.nrcs.usda.gov/sites/default/files/2023-06/8a_MT_estimation_evaporation_ponds-impound.pdf
+    % 
 end
 
+function out = drainage() 
+    out = 1; % Drainage area  = 237,000 square miles https://www.nwd-wc.usace.army.mil/dd/common/projects/www/tda.html 
+    % seepage considered 200 second feet? 
+end
 
 %% ----------------
 % 5. Plotting and post processing
@@ -642,6 +647,8 @@ legend('contMonitor','contTrueMonitor','Location','best');
 xlim([1 totalSteps]);
 grid on;
 end
+
+
 % % 
 % % % Plot surfdat, indat, turbdat, and pumpdat vs hours on a new figure
 % % figure('Units','normalized','Position',[0.15 0.15 0.6 0.5]);
